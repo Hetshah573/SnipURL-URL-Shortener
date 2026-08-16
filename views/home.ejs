@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SnipURL — Your Smart Link Shortener</title>
+    <meta name="description" content="Shorten, manage and track your URLs in one place with SnipURL.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0f0f13;
+            --surface: #18181f;
+            --surface2: #1f1f2a;
+            --border: #2a2a38;
+            --accent: #6c63ff;
+            --accent-hover: #7d75ff;
+            --accent-glow: rgba(108, 99, 255, 0.25);
+            --text: #e8e8f0;
+            --text-muted: #8888aa;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warn: #f59e0b;
+            --radius: 12px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── Nav ── */
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            height: 62px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+
+        .nav-brand {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .nav-brand .dot { color: var(--accent); }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .nav-greeting {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .nav-greeting span { color: var(--text); font-weight: 500; }
+
+        .btn-logout {
+            font-size: 0.8rem;
+            padding: 0.4rem 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* ── Layout ── */
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2.5rem 1.5rem 4rem;
+        }
+
+        /* ── Hero ── */
+        .hero {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .hero h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 0.4rem;
+        }
+
+        .hero h1 .accent { color: var(--accent); }
+
+        .hero p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* ── Card ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.75rem;
+        }
+
+        /* ── URL form ── */
+        .url-form {
+            display: flex;
+            gap: 0.75rem;
+            align-items: stretch;
+        }
+
+        .url-form input[type="url"] {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border-radius: 9px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--text);
+            font-size: 0.92rem;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .url-form input[type="url"]::placeholder { color: var(--text-muted); }
+
+        .url-form input[type="url"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .btn-primary {
+            padding: 0.75rem 1.5rem;
+            border-radius: 9px;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.15s;
+            white-space: nowrap;
+        }
+
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-primary:active { transform: translateY(0); }
+
+        /* ── Result banner ── */
+        <% if (locals.id) { %>
+        .result-banner {
+            margin-top: 1.25rem;
+            padding: 1rem 1.25rem;
+            border-radius: 9px;
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .result-banner .label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--success);
+            margin-bottom: 0.2rem;
+        }
+
+        .result-banner .short-url {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text);
+            word-break: break-all;
+        }
+
+        .btn-copy {
+            padding: 0.5rem 1rem;
+            border-radius: 7px;
+            border: 1px solid var(--success);
+            background: transparent;
+            color: var(--success);
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-copy:hover { background: rgba(34, 197, 94, 0.12); }
+
+        .btn-home {
+            padding: 0.5rem 1rem;
+            border-radius: 7px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-home:hover { border-color: var(--accent); color: var(--accent); }
+        <% } %>
+
+        /* ── Section heading ── */
+        .section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 2.5rem 0 1rem;
+        }
+
+        .section-head h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .badge {
+            font-size: 0.72rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        /* ── Table ── */
+        .table-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        thead tr {
+            background: var(--surface2);
+            border-bottom: 1px solid var(--border);
+        }
+
+        thead th {
+            padding: 0.8rem 1rem;
+            text-align: left;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+        }
+
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background 0.15s;
+        }
+
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: var(--surface2); }
+
+        tbody td {
+            padding: 0.85rem 1rem;
+            vertical-align: middle;
+        }
+
+        .idx {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            width: 3rem;
+        }
+
+        .short-link {
+            color: var(--accent);
+            font-weight: 500;
+            text-decoration: none;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            transition: color 0.15s;
+        }
+
+        .short-link:hover { color: var(--accent-hover); text-decoration: underline; }
+
+        .original-url {
+            color: var(--text-muted);
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.82rem;
+        }
+
+        .clicks-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.25rem 0.65rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .clicks-badge.zero { background: rgba(136,136,170,0.12); color: var(--text-muted); }
+        .clicks-badge.low  { background: rgba(245,158,11,0.12);  color: var(--warn); }
+        .clicks-badge.high { background: rgba(34,197,94,0.12);   color: var(--success); }
+
+        .created-at { color: var(--text-muted); font-size: 0.78rem; }
+
+        .btn-analytics {
+            font-size: 0.75rem;
+            padding: 0.3rem 0.7rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-analytics:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ── Empty state ── */
+        .empty-state {
+            text-align: center;
+            padding: 3.5rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+        .empty-state p { font-size: 0.9rem; }
+
+        /* ── Footer ── */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            border-top: 1px solid var(--border);
+            margin-top: 4rem;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-brand">
+        ✂ Snip<span class="dot">URL</span>
+    </div>
+    <div class="nav-right">
+        <% if (locals.name) { %>
+        <span class="nav-greeting">Hello, <span><%= name %></span> 👋</span>
+        <% } %>
+        <a href="/user/logout" class="btn-logout">Logout</a>
+    </div>
+</nav>
+
+<div class="container">
+
+    <!-- Hero -->
+    <div class="hero">
+        <h1>Shorten. Share. <span class="accent">Track.</span></h1>
+        <p>Paste your long URL below and get a short, shareable link instantly.</p>
+    </div>
+
+    <!-- Shorten Form -->
+    <div class="card">
+        <form class="url-form" method="POST" action="/url">
+            <input
+                type="url"
+                name="id"
+                placeholder="https://your-very-long-url.com/goes/here"
+                required
+                id="urlInput"
+            >
+            <button type="submit" class="btn-primary">Shorten →</button>
+        </form>
+
+        <!-- Result Banner -->
+        <% if (locals.id) { %>
+        <div class="result-banner" id="resultBanner">
+            <div>
+                <div class="label">✓ Your short URL is ready</div>
+                <div class="short-url" id="generatedUrl">http://localhost:5000/url/<%= id %></div>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-shrink:0;">
+                <button class="btn-copy" onclick="copyUrl()">Copy Link</button>
+                <a href="/" class="btn-home">← Dashboard</a>
+            </div>
+        </div>
+        <% } %>
+    </div>
+
+    <!-- Links Table -->
+    <div class="section-head">
+        <h2>Your Shortened Links</h2>
+        <% if (locals.urls) { %>
+        <span class="badge"><%= urls.length %> link<%= urls.length !== 1 ? 's' : '' %></span>
+        <% } %>
+    </div>
+
+    <% if (locals.urls && urls.length > 0) { %>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Short Link</th>
+                    <th>Original URL</th>
+                    <th>Clicks</th>
+                    <th>Created</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <% urls.forEach((url, index) => { %>
+                <tr>
+                    <td class="idx"><%= index + 1 %></td>
+                    <td>
+                        <a class="short-link" href="/url/<%= url.shortId %>" target="_blank">
+                            /<%= url.shortId %>
+                        </a>
+                    </td>
+                    <td>
+                        <span class="original-url" title="<%= url.redirectId %>">
+                            <%= url.redirectId %>
+                        </span>
+                    </td>
+                    <td>
+                        <%
+                          const clicks = url.visitHistory.length;
+                          const cls = clicks === 0 ? 'zero' : clicks < 10 ? 'low' : 'high';
+                        %>
+                        <span class="clicks-badge <%= cls %>">
+                            <%= clicks === 0 ? '—' : clicks %>
+                        </span>
+                    </td>
+                    <td class="created-at">
+                        <%= new Date(url.createdAt).toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' }) %>
+                    </td>
+                    <td>
+                        <a class="btn-analytics" href="/url/analytics/<%= url.shortId %>">Analytics ↗</a>
+                    </td>
+                </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    </div>
+    <% } else { %>
+    <div class="table-wrap">
+        <div class="empty-state">
+            <div class="icon">🔗</div>
+            <p>No links yet — paste a URL above to get started!</p>
+        </div>
+    </div>
+    <% } %>
+
+</div>
+
+<footer>
+    SnipURL &nbsp;·&nbsp; Built with Node.js, Express &amp; MongoDB
+</footer>
+
+<script>
+    function copyUrl() {
+        const url = document.getElementById('generatedUrl')?.innerText;
+        if (!url) return;
+        navigator.clipboard.writeText(url).then(() => {
+            const btn = document.querySelector('.btn-copy');
+            btn.textContent = 'Copied!';
+            btn.style.background = 'rgba(34,197,94,0.15)';
+            setTimeout(() => { btn.textContent = 'Copy Link'; btn.style.background = ''; }, 2000);
+        });
+    }
+</script>
+
+</body>
+</html>

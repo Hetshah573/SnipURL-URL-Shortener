@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics — SnipURL</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0f0f13; --surface: #18181f; --surface2: #1f1f2a;
+            --border: #2a2a38; --accent: #6c63ff; --text: #e8e8f0;
+            --text-muted: #8888aa; --success: #22c55e; --radius: 12px;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        nav {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 2rem; height: 62px;
+            background: var(--surface); border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .nav-brand { font-size: 1.2rem; font-weight: 700; }
+        .nav-brand .dot { color: var(--accent); }
+        .btn-home {
+            padding: 0.45rem 1.1rem; border-radius: 8px;
+            border: 1px solid var(--border); background: transparent;
+            color: var(--text-muted); font-size: 0.85rem; font-family: 'Inter', sans-serif;
+            cursor: pointer; text-decoration: none; transition: all 0.2s;
+        }
+        .btn-home:hover { border-color: var(--accent); color: var(--accent); }
+
+        .container { max-width: 800px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+
+        .page-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.3rem; }
+        .page-sub { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 2rem; }
+
+        /* ── Stat cards ── */
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 1.25rem 1.5rem;
+        }
+        .stat-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.4rem; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: var(--accent); }
+
+        .info-row { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.3rem; }
+        .info-row span { color: var(--text); font-weight: 500; word-break: break-all; }
+
+        /* ── Table ── */
+        .section-title { font-size: 0.9rem; font-weight: 600; margin: 2rem 0 0.75rem; }
+        .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        thead tr { background: var(--surface2); border-bottom: 1px solid var(--border); }
+        thead th { padding: 0.75rem 1rem; text-align: left; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+        tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: var(--surface2); }
+        tbody td { padding: 0.75rem 1rem; color: var(--text-muted); font-size: 0.82rem; }
+        .idx { width: 3rem; }
+
+        .empty-state { text-align: center; padding: 3rem 2rem; color: var(--text-muted); font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-brand">✂ Snip<span class="dot">URL</span></div>
+    <a href="/" class="btn-home">← Dashboard</a>
+</nav>
+
+<div class="container">
+    <div class="page-title">Link Analytics</div>
+    <div class="page-sub">Performance breakdown for your short URL</div>
+
+    <!-- Meta info -->
+    <div class="info-row">Short ID: <span><%= shortId %></span></div>
+    <div class="info-row">Original URL: <span><%= redirectId %></span></div>
+    <div class="info-row">Short link: <span>http://localhost:5000/url/<%= shortId %></span></div>
+
+    <!-- Stat cards -->
+    <div class="stats" style="margin-top:1.5rem;">
+        <div class="stat-card">
+            <div class="stat-label">Total Clicks</div>
+            <div class="stat-value"><%= totalClicks %></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Created</div>
+            <div class="stat-value" style="font-size:1rem;padding-top:0.5rem;"><%= createdAt %></div>
+        </div>
+    </div>
+
+    <!-- Visit history table -->
+    <div class="section-title">Visit History</div>
+    <div class="table-wrap">
+        <% if (visitHistory.length > 0) { %>
+        <table>
+            <thead>
+                <tr>
+                    <th class="idx">#</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% visitHistory.forEach((v, i) => { %>
+                <tr>
+                    <td class="idx"><%= i + 1 %></td>
+                    <td><%= new Date(v.timestamps).toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' }) %></td>
+                </tr>
+                <% }) %>
+            </tbody>
+        </table>
+        <% } else { %>
+        <div class="empty-state">No visits recorded yet — share the link to start tracking!</div>
+        <% } %>
+    </div>
+</div>
+
+</body>
+</html>

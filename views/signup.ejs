@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up — SnipURL</title>
+    <meta name="description" content="Create a free SnipURL account and start shortening links in seconds.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0f0f13;
+            --surface: #18181f;
+            --surface2: #1f1f2a;
+            --border: #2a2a38;
+            --accent: #6c63ff;
+            --accent-hover: #7d75ff;
+            --accent-glow: rgba(108, 99, 255, 0.25);
+            --text: #e8e8f0;
+            --text-muted: #8888aa;
+            --danger: #ef4444;
+            --radius: 14px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+
+        /* ── Brand ── */
+        .brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .brand .dot { color: var(--accent); }
+
+        /* ── Card ── */
+        .card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2.25rem 2rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+        }
+
+        .card-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1.75rem;
+        }
+
+        /* ── Form ── */
+        .form-group {
+            margin-bottom: 1.15rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 0.4rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 9px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--text);
+            font-size: 0.92rem;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input::placeholder { color: var(--text-muted); }
+
+        input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+
+        /* ── Button ── */
+        .btn-primary {
+            width: 100%;
+            margin-top: 0.5rem;
+            padding: 0.8rem;
+            border-radius: 9px;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.95rem;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.15s;
+        }
+
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-primary:active { transform: translateY(0); }
+
+        /* ── Divider ── */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 1.5rem 0 1rem;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+        }
+
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ── Perks ── */
+        .perks {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .perk {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .perk .icon { font-size: 0.9rem; }
+
+        /* ── Footer link ── */
+        .card-footer {
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .card-footer a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .card-footer a:hover { text-decoration: underline; }
+
+        /* ── Terms note ── */
+        .terms {
+            margin-top: 1rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-align: center;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="brand">✂ Snip<span class="dot">URL</span></div>
+
+    <div class="card">
+        <div class="card-title">Create your account</div>
+        <div class="card-sub">Free forever — no credit card required.</div>
+
+        <div class="perks">
+            <div class="perk"><span class="icon">✂</span> Instantly shorten any URL</div>
+            <div class="perk"><span class="icon">📊</span> Track click analytics per link</div>
+            <div class="perk"><span class="icon">🔒</span> Private links — only you can see them</div>
+        </div>
+
+        <div class="divider">Get started</div>
+
+        <form action="/user" method="POST" id="signupForm">
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    placeholder="Jane Doe"
+                    required
+                    autocomplete="name"
+                >
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="you@example.com"
+                    required
+                    autocomplete="email"
+                >
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Min. 8 characters"
+                    required
+                    minlength="8"
+                    autocomplete="new-password"
+                >
+            </div>
+            <button type="submit" class="btn-primary">Create Account →</button>
+        </form>
+
+        <p class="terms">By signing up you agree to our terms of service.</p>
+
+        <div class="card-footer">
+            Already have an account? <a href="/login">Sign in</a>
+        </div>
+    </div>
+
+
+</body>
+</html>
