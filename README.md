@@ -1,6 +1,6 @@
-# ✂ SnipURL — URL Shortener with Authentication
+# ✂ SnipURL — Production-Grade URL Shortener
 
-> A full-stack URL shortening web app built with **Node.js**, **Express**, **MongoDB**, and **EJS** — featuring session-based authentication, per-user link management, and click analytics.
+> A full-stack URL shortening web app built with **Node.js**, **Express v5**, **MongoDB**, and **EJS** — featuring JWT authentication, bcrypt password hashing, rate limiting, custom aliases, link expiry, QR codes, and rich visitor analytics.
 
 ---
 
@@ -8,13 +8,16 @@
 
 | Feature | Details |
 |---|---|
-| 🔗 URL Shortening | Paste any long URL and get a compact short link |
-| 🔐 User Auth | Sign up / Log in with session-based authentication (cookie + in-memory store) |
-| 👤 Private Links | Each user only sees and manages their own shortened links |
-| 📊 Click Tracking | Every redirect is timestamped and total click counts are shown per link |
-| 🕒 Created-at Dates | Each link records when it was created (via Mongoose timestamps) |
-| ⚡ Instant Redirect | Visiting `localhost:5000/url/:id` redirects the browser to the original URL |
-| 🧩 MVC Architecture | Clean separation of models, controllers, routes, services, and middlewares |
+| 🔗 URL Shortening | Paste any `http://` or `https://` URL and get a short link (`shortid`) or custom slug |
+| 🏷️ Custom Aliases | Optional 3–30 character slugs (`/url/my-brand`) with uniqueness validation |
+| ⏳ Link Expiry | Optional expiration date per link — expired links return `410 Gone` |
+| ⏸️ Pause / Resume & Delete | Toggle links active/paused (`isActive`) or delete them permanently from dashboard/analytics |
+| 📱 QR Code Generation | Server-side dark-themed QR code PNG on every link's analytics page with download |
+| 🔐 JWT & bcrypt Auth | `bcryptjs` password hashing, stateless JWT in `httpOnly` `token` cookie, timing-safe login, logout |
+| 🛡️ Security Hardening | `helmet` CSP/security headers, `express-rate-limit` on login/signup/shorten, global error handler |
+| 📊 Rich Visitor Analytics | Tracks country & city (`geoip-lite`), browser/OS/device (`ua-parser-js`), referrer, and hashed IP |
+| 📈 Interactive Charts | 7-day click bar chart & device breakdown doughnut chart via Chart.js + leaderboards |
+| 🧪 Automated Tests | 84 unit/schema tests + 12 HTTP integration tests via `npm test` |
 
 ---
 
@@ -23,149 +26,41 @@
 ```
 15_URL_Shortener_EJS_Authentication/
 │
-├── index.js                   # App entry point — mounts routes & starts server
+├── index.js                   # Entry point — dotenv, Helmet CSP, routes, error handler, graceful shutdown
 ├── connection.js              # MongoDB connection via Mongoose
-├── package.json
+├── package.json               # Scripts: start (nodemon), test (unit + integration)
+├── .env                       # Environment config (ignored by git)
 │
 ├── models/
-│   ├── url.js                 # URL Schema (shortId, redirectId, visitHistory, createdBy)
-│   └── user.js                # User Schema (name, email, password)
+│   ├── url.js                 # URL Schema (shortId, redirectId, expiresAt, isActive, enriched visitHistory)
+│   └── user.js                # User Schema (name, email, hashed password)
 │
 ├── controllers/
-│   ├── url.js                 # Handlers: generate short URL, redirect, analytics
-│   └── user.js                # Handlers: signup, login
+│   ├── url.js                 # Shorten, public redirect + telemetry, analytics + QR, toggle, delete
+│   └── user.js                # Signup (bcrypt), login (JWT httpOnly cookie), logout
 │
 ├── routes/
-│   ├── staticroute.js         # GET /  → home dashboard (auth-checked)
-│   ├── url.js                 # POST /url, GET /url/:id, GET /url/analytics/:id
-│   └── user.js                # POST /user (signup), POST /user/login
+│   ├── staticroute.js         # GET /, /login, /signup, /Signup → /signup
+│   ├── url.js                 # POST /url, GET /url/analytics/:id, POST /url/toggle/:id, POST /url/delete/:id, GET /url/:id
+│   └── user.js                # POST /user, POST /user/login, GET /user/logout
 │
 ├── middlewares/
-│   └── auth.js                # restrictToLoggedInUserOnly, checkAuth
+│   ├── auth.js                # restrictToLoggedInUserOnly, checkAuth (reads JWT token cookie)
+│   └── rateLimiter.js         # loginLimiter (10/15m), signupLimiter (5/hr), urlShortenLimiter (30/15m)
 │
 ├── service/
-│   └── auth.js                # In-memory session store (Map)
+│   └── auth.js                # Stateless JWT sign & verify (setUser / getUser)
 │
-└── views/                     # EJS templates
-    ├── home.ejs               # Dashboard — shorten form + links table
-    ├── login.ejs              # Login form
-    ├── signup.ejs             # Signup form
-    └── analytics.ejs          # Per-link analytics page (clicks + visit timestamps)
-```
-
----
-
-## 🏗️ Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Browser (Client)                        │
-└───────────────────────┬─────────────────────────────────────────┘
-                        │  HTTP Request (+ uid cookie)
-                        ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Express Server (index.js)                  │
-│                                                                 │
-│   ┌──────────────────────────────────────────────────────────┐  │
-│   │                     Middleware Stack                     │  │
-│   │  express.json()  ·  express.urlencoded()  ·  cookieParser│  │
-│   └──────────────────────────────────────────────────────────┘  │
-│                              │                                  │
-│         ┌────────────────────┼─────────────────────┐           │
-│         ▼                    ▼                     ▼           │
-│  ┌─────────────┐   ┌──────────────────┐   ┌─────────────┐     │
-│  │  /user      │   │  /  (static)     │   │  /url       │     │
-│  │  routes     │   │  staticroute.js  │   │  routes     │     │
-│  └──────┬──────┘   └────────┬─────────┘   └──────┬──────┘     │
-│         │                   │  checkAuth          │            │
-│         │             auth middleware   restrictToLoggedIn     │
-│         ▼                   ▼                     ▼           │
-│  ┌─────────────┐   ┌──────────────────┐   ┌─────────────┐     │
-│  │   user      │   │  Render home.ejs │   │   url       │     │
-│  │ controller  │   │  (urls + name)   │   │ controller  │     │
-│  └──────┬──────┘   └──────────────────┘   └──────┬──────┘     │
-└─────────┼──────────────────────────────────────── ┼ ──────────┘
-          │                                         │
-          ▼                                         ▼
-┌─────────────────────┐                 ┌───────────────────────┐
-│    service/auth.js  │                 │     MongoDB via        │
-│  (In-memory Map)    │                 │     Mongoose ORM       │
-│  sessionId → user   │                 │  ┌─────────┐          │
-└─────────────────────┘                 │  │  URLs   │          │
-                                        │  ├─────────┤          │
-                                        │  │  Users  │          │
-                                        │  └─────────┘          │
-                                        └───────────────────────┘
-```
-
----
-
-## 🔄 Request Flow Diagrams
-
-### Sign Up Flow
-```
-User fills Signup form
-        │
-        ▼
-POST /user  →  handleUserSignup
-        │
-        ▼
-User.create({ name, email, password })
-        │
-        ▼
-Render login.ejs  (prompt user to log in)
-```
-
-### Login Flow
-```
-User fills Login form
-        │
-        ▼
-POST /user/login  →  handleUserLogin
-        │
-        ▼
-User.findOne({ email, password })
-        │
-   ┌────┴────┐
-   │         │
-Not found  Found
-   │         │
-Render     uuidv4() → sessionId
-login.ejs  setUser(sessionId, user)   ← stored in Map
-(error)    Set cookie: uid=sessionId
-           │
-           ▼
-       redirect /
-```
-
-### Shorten URL Flow
-```
-User submits URL form (POST /url)
-        │
-        ▼
-restrictToLoggedInUserOnly middleware
-   checks cookie → looks up Map → sets req.user
-        │
-        ▼
-handleGenerateNewShortURL
-   shortid() → shortID
-   URL.create({ shortId, redirectId, visitHistory:[], createdBy: req.user._id })
-        │
-        ▼
-Render home.ejs (shows new short link + full table)
-```
-
-### Redirect Flow
-```
-Browser visits /url/:id
-        │
-        ▼
-handleRedirectToURL
-   URL.findOneAndUpdate({ shortId })
-   $push visitHistory: { timestamps: Date.now() }
-        │
-        ▼
-res.redirect(result.redirectId)   →   Original URL
+├── views/                     # EJS templates
+│   ├── home.ejs               # Dashboard — shorten form, advanced options, links table, actions
+│   ├── analytics.ejs          # Charts, QR code, unique visitors, country/browser/OS/referrer breakdown
+│   ├── login.ejs              # Login form with error & registration success banners
+│   ├── signup.ejs             # Signup form with validation error banner
+│   └── error.ejs              # Friendly error page (403, 404, 410, 500)
+│
+└── tests/
+    ├── phase2.test.js         # 84 unit & schema validation tests
+    └── integration.test.js    # 12 in-process HTTP integration tests (routes, cookies, EJS, telemetry)
 ```
 
 ---
@@ -174,14 +69,12 @@ res.redirect(result.redirectId)   →   Original URL
 
 | Layer | Technology |
 |---|---|
-| Runtime | Node.js |
+| Runtime | Node.js (v18+) |
 | Framework | Express.js v5 |
-| Database | MongoDB (local) |
-| ODM | Mongoose v8 |
-| View Engine | EJS v6 |
-| Session | Cookie + In-memory Map |
-| ID Generation | `shortid`, `uuid` |
-| Dev Server | Nodemon |
+| Database & ODM | MongoDB + Mongoose v8 |
+| View Engine | EJS v6 + Chart.js v4 (CDN) |
+| Auth & Security | `jsonwebtoken`, `bcryptjs`, `helmet`, `express-rate-limit`, `dotenv` |
+| Analytics & QR | `ua-parser-js`, `geoip-lite`, `qrcode`, `shortid` |
 
 ---
 
@@ -189,85 +82,93 @@ res.redirect(result.redirectId)   →   Original URL
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v18+ recommended)
-- [MongoDB](https://www.mongodb.com/try/download/community) running locally on port `27017`
-- npm
+- [MongoDB](https://www.mongodb.com/try/download/community) running locally on port `27017` (or a remote MongoDB URI)
 
 ### Steps
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<your-username>/url-shortener-ejs-auth.git
-cd url-shortener-ejs-auth
+git clone https://github.com/Hetshah573/SnipURL-URL-Shortener.git
+cd SnipURL-URL-Shortener
 
 # 2. Install dependencies
 npm install
 
-# 3. Make sure MongoDB is running locally
-# Windows: net start MongoDB
-# macOS/Linux: mongod --dbpath /data/db
+# 3. Create a .env file in the project root
+PORT=5000
+MONGO_URI=mongodb://localhost:27017/short-url
+JWT_SECRET=replace_with_a_long_random_secret_string
+JWT_EXPIRES_IN=7d
 
-# 4. Start the development server
+# 4. Run the test suite
+npm test
+
+# 5. Start the development server
 npm start
-# → Server running on PORT 5000
-# → MongoDB connected successfully
-
-# 5. Open your browser
-open http://localhost:5000
 ```
 
-> **Note:** The app connects to `mongodb://localhost:27017/short-url` by default. You can change this in `index.js`.
+Open `http://localhost:5000` in your browser.
 
 ---
 
-## 🌐 API / Route Reference
+## 🌐 Route Reference
 
 ### Static Routes
-
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/` | ✅ Required | Home dashboard — shows all user's links |
-| `GET` | `/login` | ❌ | Login page |
-| `GET` | `/Signup` | ❌ | Signup page |
+| `GET` | `/login` | ❌ | Login page (redirects to `/` if already logged in) |
+| `GET` | `/signup` | ❌ | Signup page (`/Signup` redirects here) |
 
 ### User Routes (`/user`)
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/user` | ❌ | Create a new account |
-| `POST` | `/user/login` | ❌ | Log in, receive session cookie |
+| Method | Path | Auth | Rate Limit | Description |
+|---|---|---|---|---|
+| `POST` | `/user` | ❌ | 5 / hour | Create account (hashes password with bcrypt) |
+| `POST` | `/user/login` | ❌ | 10 / 15 min | Verify credentials & set `httpOnly` JWT `token` cookie |
+| `GET` | `/user/logout` | ❌ | — | Clear `token` cookie & redirect to `/login` |
 
 ### URL Routes (`/url`)
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/url` | ✅ Required | Shorten a new URL |
-| `GET` | `/url/:id` | ❌ | Redirect to original URL + record visit |
-| `GET` | `/url/analytics/:id` | ✅ Required | Renders analytics page — total clicks & visit timestamps — **owner only** (403 if not yours) |
+| Method | Path | Auth | Rate Limit | Description |
+|---|---|---|---|---|
+| `POST` | `/url` | ✅ Required | 30 / 15 min | Shorten URL (supports `customAlias` & `expiresAt`) |
+| `GET` | `/url/:id` | ❌ Public | — | Redirect to original URL (`404` if paused/missing, `410` if expired) + record visitor telemetry |
+| `GET` | `/url/analytics/:id` | ✅ Owner only | — | Render analytics dashboard, QR code, & charts (`403` if not owner) |
+| `POST` | `/url/toggle/:id` | ✅ Owner only | — | Pause or resume link (`isActive`) |
+| `POST` | `/url/delete/:id` | ✅ Owner only | — | Permanently delete link |
 
 ---
 
 ## 🗃️ Database Schema
 
 ### `urls` Collection
-
 ```js
 {
-  shortId:      String,   // Unique short ID (e.g. "Uf3kX9")
-  redirectId:   String,   // The original long URL
-  visitHistory: [{ timestamps: Number }],  // Unix ms timestamps of each visit
+  shortId:      String,   // Unique short ID or custom alias
+  redirectId:   String,   // Original http/https URL
+  expiresAt:    Date,     // Optional expiry timestamp (null = permanent)
+  isActive:     Boolean,  // Active/paused toggle (default: true)
+  visitHistory: [{
+    timestamps: Number,   // Unix ms
+    ip:         String,   // 16-char SHA-256 hash of visitor IP
+    country:    String,   // Country code (via geoip-lite)
+    city:       String,   // City name
+    browser:    String,   // Browser name (via ua-parser-js)
+    os:         String,   // Operating system
+    device:     String,   // Desktop | Mobile | Tablet | Other
+    referrer:   String    // Referer header or "(direct)"
+  }],
   createdBy:    ObjectId, // Reference to user._id
-  createdAt:    Date,     // Auto-managed by Mongoose
+  createdAt:    Date,
   updatedAt:    Date
 }
 ```
 
 ### `users` Collection
-
 ```js
 {
-  name:      String,  // Full name
-  email:     String,  // Unique email (login credential)
-  password:  String,  // Plain text (see improvements below)
+  name:      String,
+  email:     String,  // Unique
+  password:  String,  // bcrypt hash
   createdAt: Date,
   updatedAt: Date
 }
@@ -275,27 +176,18 @@ open http://localhost:5000
 
 ---
 
-## 🚧 Known Limitations & Suggested Improvements
+## 🧪 Running Tests
 
-| # | Issue | Recommendation |
-|---|---|---|
-| 1 | **Passwords stored in plain text** | Hash passwords with `bcrypt` before saving |
-| 2 | **In-memory session store** | Sessions are lost on server restart. Use `express-session` + `connect-mongo` |
-| 3 | **No input sanitization** | Validate URLs and user inputs with `express-validator` |
-| 4 | **No logout route** | Add `GET /user/logout` to clear the `uid` cookie |
-| 5 | **No HTTPS / env config** | Use `.env` with `dotenv` to externalize secrets and the DB URI |
-| 6 | **Analytics has no chart** | Add a visual click-over-time chart (e.g. Chart.js) to the analytics page |
-| 7 | **ShortID is deprecated** | Replace `shortid` with `nanoid` (shorter, more collision-safe) |
-| 8 | **No custom aliases** | Allow users to choose their own slug (e.g. `/url/my-brand`) |
-| 9 | **No link expiry** | Add optional TTL per URL |
-| 10 | **No rate limiting** | Add `express-rate-limit` to prevent abuse |
+```bash
+npm test
+```
+
+Runs:
+1. `node tests/phase2.test.js` — 84 unit & schema tests
+2. `node tests/integration.test.js` — 12 in-process HTTP integration tests (auth, custom alias, expiry, pause/delete, public redirect, telemetry, and analytics rendering)
 
 ---
 
 ## 📄 License
 
 This project is for educational purposes. Feel free to fork and extend it.
-
----
-
-> Built with Node.js · Express · MongoDB · EJS
