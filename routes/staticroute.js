@@ -5,31 +5,37 @@ const router = express.Router();
 
 const PAGE_SIZE = 10;
 
-// Home / dashboard — supports ?q= (search), ?sort= (newest|oldest|most_clicked), ?page=
+// Home / dashboard — supports ?q= (search), ?tag= (tag filter), ?sort=, ?page=
 router.get("/", async (req, res) => {
   if (!req.user) return res.redirect("/login");
 
   const allurls = await URL.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
   const userDoc = await User.findOne({ _id: req.user._id });
 
-  // One-time flash for newly generated API key
   const newApiKey = req.cookies?.new_api_key || null;
   if (newApiKey) res.clearCookie("new_api_key");
 
-  // Banner for newly created short URL (PRG)
   const createdId = req.query.created;
   const createdUrl = createdId ? allurls.find((u) => u.shortId === createdId) : null;
 
-  // Search filter
+  // Collect all unique tags across user's links
+  const allTags = [...new Set(allurls.flatMap((u) => u.tags || []))].sort();
+
+  // Search & Tag filter
   const q = (req.query.q || "").trim();
+  const tag = (req.query.tag || "").trim().toLowerCase();
   let filtered = allurls;
   if (q) {
     const lower = q.toLowerCase();
-    filtered = allurls.filter(
+    filtered = filtered.filter(
       (u) =>
         u.shortId.toLowerCase().includes(lower) ||
-        u.redirectId.toLowerCase().includes(lower)
+        u.redirectId.toLowerCase().includes(lower) ||
+        (u.tags || []).some((t) => t.includes(lower))
     );
+  }
+  if (tag) {
+    filtered = filtered.filter((u) => (u.tags || []).includes(tag));
   }
 
   // Sort
@@ -56,6 +62,8 @@ router.get("/", async (req, res) => {
     newShortId: createdUrl ? createdUrl.shortId : null,
     newShortUrl: createdUrl ? `${req.protocol}://${req.get("host")}/url/${createdUrl.shortId}` : null,
     q,
+    tag,
+    allTags,
     sort,
     page,
     totalPages,

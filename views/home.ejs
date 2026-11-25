@@ -257,6 +257,48 @@
                     >
                     <span class="field-hint">Leave blank for a permanent link</span>
                 </div>
+                <div class="field-group">
+                    <label class="field-label" for="maxClicks">Max Clicks Limit</label>
+                    <input
+                        type="number"
+                        class="field-input"
+                        id="maxClicks"
+                        name="maxClicks"
+                        placeholder="e.g. 100"
+                        min="1"
+                    >
+                    <span class="field-hint">Auto-expires after N clicks</span>
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="linkPassword">Link Password 🔒</label>
+                    <input
+                        type="password"
+                        class="field-input"
+                        id="linkPassword"
+                        name="linkPassword"
+                        placeholder="Optional visitor password"
+                    >
+                    <span class="field-hint">Visitors must unlock before redirect</span>
+                </div>
+                <div class="field-group" style="grid-column: span 2;">
+                    <label class="field-label" for="tags">Tags / Folders</label>
+                    <input
+                        type="text"
+                        class="field-input"
+                        id="tags"
+                        name="tags"
+                        placeholder="marketing, resume, youtube"
+                    >
+                    <span class="field-hint">Comma-separated tags to organize your links</span>
+                </div>
+                <div class="field-group" style="grid-column: span 2;">
+                    <label class="field-label">UTM Builder (Optional)</label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
+                        <input type="text" class="field-input" name="utmSource" placeholder="utm_source (e.g. twitter)">
+                        <input type="text" class="field-input" name="utmMedium" placeholder="utm_medium (e.g. social)">
+                        <input type="text" class="field-input" name="utmCampaign" placeholder="utm_campaign (e.g. launch)">
+                    </div>
+                </div>
             </div>
         </form>
 
@@ -301,6 +343,22 @@
         <% } %>
     </form>
 
+    <% if (locals.allTags && allTags.length > 0) { %>
+    <div style="display:flex;gap:0.45rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;">
+        <span style="font-size:0.75rem;color:var(--text-muted);">Tags:</span>
+        <% allTags.forEach(t => { %>
+        <a href="/?tag=<%= encodeURIComponent(t) %>&sort=<%= locals.sort || 'newest' %>"
+           class="btn-sm"
+           style="<%= locals.tag === t ? 'border-color:var(--accent);color:var(--accent);' : '' %>">
+           #<%= t %>
+        </a>
+        <% }) %>
+        <% if (locals.tag) { %>
+        <a href="/?sort=<%= locals.sort || 'newest' %>" class="btn-sm danger">× Clear tag</a>
+        <% } %>
+    </div>
+    <% } %>
+
     <% if (locals.urls && urls.length > 0) { %>
     <div class="table-wrap">
         <table>
@@ -325,11 +383,19 @@
                     <td class="idx"><%= index + 1 %></td>
                     <td>
                         <a class="short-link" href="/url/<%= url.shortId %>" target="_blank">/<%- url.shortId %></a>
+                        <% if (url.passwordHash) { %><span title="Password protected" style="margin-left:0.25rem;">🔒</span><% } %>
                         <% if (url.expiresAt) { %>
                         <div>
                             <span class="expiry-pill <%= isExpired ? 'expired' : 'active' %>">
                                 <%= isExpired ? '⏰ Expired' : '⏳ Expires ' + new Date(url.expiresAt).toLocaleDateString('en-US', {month:'short', day:'numeric'}) %>
                             </span>
+                        </div>
+                        <% } %>
+                        <% if (url.tags && url.tags.length > 0) { %>
+                        <div style="display:flex;gap:0.25rem;flex-wrap:wrap;margin-top:0.25rem;">
+                            <% url.tags.forEach(t => { %>
+                            <a href="/?tag=<%= encodeURIComponent(t) %>" style="font-size:0.68rem;padding:0.1rem 0.4rem;border-radius:999px;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);text-decoration:none;">#<%= t %></a>
+                            <% }) %>
                         </div>
                         <% } %>
                     </td>
@@ -338,7 +404,7 @@
                     </td>
                     <td>
                         <span class="clicks-badge <%= cls %>">
-                            <%= clicks === 0 ? '—' : clicks %>
+                            <%= clicks === 0 ? '—' : clicks %><%= url.maxClicks ? ' / ' + url.maxClicks : '' %>
                         </span>
                     </td>
                     <td>
@@ -400,6 +466,7 @@
         <div class="api-head">
             <h3>🔑 Developer REST API</h3>
             <div style="display:flex;gap:0.5rem;">
+                <a href="/api-docs" target="_blank" class="btn-sm">Swagger Docs ↗</a>
                 <form method="POST" action="/user/api-key" style="display:inline">
                     <button type="submit" class="btn-sm">
                         <%= locals.apiKeyPrefix ? '↻ Regenerate Key' : '+ Generate API Key' %>

@@ -3,6 +3,8 @@ require("dotenv").config(); // Must be first — loads .env before anything else
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
+const mongoose = require("mongoose");
+const swaggerUi = require("swagger-ui-express");
 const path = require("path");
 
 const connectMongoDb = require("./connection.js");
@@ -11,9 +13,11 @@ const urlroute = require("./routes/url");
 const userroute = require("./routes/user.js");
 const apiroute = require("./routes/api.js");
 const { checkAuth } = require("./middlewares/auth.js");
-const { getRedisClient, closeRedis } = require("./service/cache.js");
+const { getRedisClient, isRedisReady, closeRedis } = require("./service/cache.js");
+const swaggerSpec = require("./service/swagger.js");
 
 const app = express();
+app.set("trust proxy", 1); // Required behind reverse proxies (Render, Railway, Nginx, Cloudflare)
 const PORT = process.env.PORT || 5000;
 
 // ── Database ──────────────────────────────────────────────────────────────────
@@ -49,6 +53,14 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+app.get("/health", (req, res) => {
+  res.json({
+    ok: true,
+    mongo: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    redis: isRedisReady() ? "connected" : "fallback",
+  });
+});
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/api/v1", apiroute);
 app.use("/url", urlroute);
 app.use("/", checkAuth, staticroute);

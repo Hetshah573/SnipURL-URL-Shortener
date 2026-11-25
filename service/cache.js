@@ -83,6 +83,8 @@ async function setCachedUrl(shortId, data, ttlSeconds = DEFAULT_TTL_SEC) {
       redirectId: data.redirectId,
       expiresAt: data.expiresAt || null,
       isActive: data.isActive !== false,
+      hasPassword: Boolean(data.passwordHash || data.hasPassword),
+      maxClicks: data.maxClicks || null,
     });
     await redis.set(cacheKey(shortId), payload, "EX", ttl);
     return true;

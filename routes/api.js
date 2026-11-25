@@ -1,9 +1,17 @@
 const express = require("express");
 const shortid = require("shortid");
+const bcrypt = require("bcryptjs");
 const URL = require("../models/url");
 const { authenticateApiKey } = require("../middlewares/apiAuth");
 const { urlShortenLimiter } = require("../middlewares/rateLimiter");
-const { isValidHttpUrl, isValidAlias, aggregate } = require("../controllers/url");
+const {
+  isValidHttpUrl,
+  isValidAlias,
+  appendUtmParams,
+  parseTags,
+  filterVisitsByRange,
+  aggregate,
+} = require("../controllers/url");
 const { setCachedUrl, delCachedUrl } = require("../service/cache");
 
 const router = express.Router();
@@ -13,14 +21,25 @@ router.use(authenticateApiKey);
 
 /**
  * POST /api/v1/shorten
- * Body: { url, customAlias?, expiresAt? }
  */
 router.post("/shorten", urlShortenLimiter, async (req, res) => {
-  const { url: originalUrl, customAlias, expiresAt } = req.body;
+  const {
+    url: rawUrl,
+    customAlias,
+    expiresAt,
+    maxClicks,
+    password,
+    tags,
+    utmSource,
+    utmMedium,
+    utmCampaign,
+  } = req.body;
 
-  if (!originalUrl || !isValidHttpUrl(originalUrl)) {
+  if (!rawUrl || !isValidHttpUrl(rawUrl)) {
     return res.status(400).json({ error: "A valid http:// or https:// url is required." });
   }
+
+  const originalUrl = appendUtmParams(rawUrl, { utmSource, utmMedium, utmCampaign });
 
   const existingOriginal = await URL.findOne({ redirectId: originalUrl, createdBy: req.user._id });
   if (existingOriginal) {
@@ -53,12 +72,27 @@ router.post("/shorten", urlShortenLimiter, async (req, res) => {
     }
   }
 
+  let parsedMaxClicks = null;
+  if (maxClicks !== undefined && maxClicks !== null && maxClicks !== "") {
+    const n = parseInt(maxClicks, 10);
+    if (isNaN(n) || n < 1) {
+      return res.status(400).json({ error: "maxClicks must be a positive integer." });
+    }
+    parsedMaxClicks = n;
+  }
+
+  const passwordHash = password && String(password).trim() ? await bcrypt.hash(String(password).trim(), 10) : null;
+  const parsedTags = parseTags(tags);
+
   const created = await URL.create({
     shortId,
     redirectId: originalUrl,
     visitHistory: [],
     createdBy: req.user._id,
     expiresAt: expiry,
+    maxClicks: parsedMaxClicks,
+    passwordHash,
+    tags: parsedTags,
   });
 
   await setCachedUrl(shortId, created);
@@ -68,19 +102,33 @@ router.post("/shorten", urlShortenLimiter, async (req, res) => {
     shortUrl: `${req.protocol}://${req.get("host")}/url/${shortId}`,
     redirectId: originalUrl,
     expiresAt: expiry,
+    maxClicks: parsedMaxClicks,
+    passwordProtected: Boolean(passwordHash),
+    tags: parsedTags,
   });
 });
 
 /**
- * GET /api/v1/links?q=&sort=&page=&limit=
+ * GET /api/v1/links?q=&tag=&sort=&page=&limit=
  */
 router.get("/links", async (req, res) => {
   const allurls = await URL.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
 
   const q = (req.query.q || "").trim().toLowerCase();
-  let filtered = q
-    ? allurls.filter((u) => u.shortId.toLowerCase().includes(q) || u.redirectId.toLowerCase().includes(q))
-    : allurls;
+  const tag = (req.query.tag || "").trim().toLowerCase();
+
+  let filtered = allurls;
+  if (q) {
+    filtered = filtered.filter(
+      (u) =>
+        u.shortId.toLowerCase().includes(q) ||
+        u.redirectId.toLowerCase().includes(q) ||
+        (u.tags || []).some((t) => t.includes(q))
+    );
+  }
+  if (tag) {
+    filtered = filtered.filter((u) => (u.tags || []).includes(tag));
+  }
 
   const sort = req.query.sort || "newest";
   if (sort === "oldest") {
@@ -102,6 +150,9 @@ router.get("/links", async (req, res) => {
       humanClicks: u.visitHistory.filter((v) => !v.isBot).length,
       isActive: u.isActive,
       expiresAt: u.expiresAt,
+      maxClicks: u.maxClicks || null,
+      passwordProtected: Boolean(u.passwordHash),
+      tags: u.tags || [],
       createdAt: u.createdAt,
     })),
     pagination: { page, limit, total: filtered.length, totalPages },
@@ -109,19 +160,23 @@ router.get("/links", async (req, res) => {
 });
 
 /**
- * GET /api/v1/analytics/:id
+ * GET /api/v1/analytics/:id?range=24h|7d|30d|all
  */
 router.get("/analytics/:id", async (req, res) => {
   const doc = await URL.findOne({ shortId: req.params.id, createdBy: req.user._id });
   if (!doc) return res.status(404).json({ error: "Link not found." });
 
-  const humanVisits = doc.visitHistory.filter((v) => !v.isBot);
+  const range = ["24h", "7d", "30d", "all"].includes(req.query.range) ? req.query.range : "all";
+  const history = filterVisitsByRange(doc.visitHistory, range);
+  const humanVisits = history.filter((v) => !v.isBot);
+
   return res.json({
     shortId: doc.shortId,
     redirectId: doc.redirectId,
-    totalClicks: doc.visitHistory.length,
+    range,
+    totalClicks: history.length,
     humanClicks: humanVisits.length,
-    botClicks: doc.visitHistory.length - humanVisits.length,
+    botClicks: history.length - humanVisits.length,
     uniqueClicks: new Set(humanVisits.map((v) => v.ip)).size,
     topBrowsers: aggregate(humanVisits.map((v) => v.browser)),
     topCountries: aggregate(humanVisits.map((v) => v.country)),
@@ -131,7 +186,6 @@ router.get("/analytics/:id", async (req, res) => {
 
 /**
  * PATCH /api/v1/links/:id
- * Body: { redirectId }
  */
 router.patch("/links/:id", async (req, res) => {
   const { redirectId } = req.body;
