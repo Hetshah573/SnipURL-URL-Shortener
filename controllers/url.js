@@ -97,8 +97,8 @@ async function handleGenerateNewShortURL(req, res) {
 
   await URL.create({ shortId, redirectId: originalUrl, visitHistory: [], createdBy: req.user._id, expiresAt: expiry });
 
-  const urls = await URL.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
-  return res.render("home", { urls, name: req.user.name, newShortId: shortId, newShortUrl: buildShortUrl(req, shortId) });
+  // Post/Redirect/Get: prevents duplicate link creation when user refreshes the page
+  return res.redirect(`/?created=${encodeURIComponent(shortId)}`);
 }
 
 // ─── Redirect + collect analytics ────────────────────────────────────────────

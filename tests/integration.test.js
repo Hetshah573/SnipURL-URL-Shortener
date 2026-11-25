@@ -232,7 +232,7 @@ async function test(label, fn) {
     assert(res.body.includes("valid http:// or https://"), "Should reject javascript: URL");
   });
 
-  await test("POST /url creates short link with custom alias & future expiry", async () => {
+  await test("POST /url creates short link with custom alias & future expiry (PRG redirect)", async () => {
     const future = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
     const res = await request("POST", "/url", {
       headers: {
@@ -241,10 +241,17 @@ async function test(label, fn) {
       },
       body: `id=https://nodejs.org&customAlias=node-docs&expiresAt=${future}`,
     });
-    assert.strictEqual(res.status, 200);
-    assert(res.body.includes("/url/node-docs"), "Rendered page should contain new short URL");
+    assert.strictEqual(res.status, 302);
+    assert.strictEqual(res.headers.location, "/?created=node-docs");
     assert.strictEqual(urlsStore.length, 1);
     assert.strictEqual(urlsStore[0].shortId, "node-docs");
+
+    const homeRes = await request("GET", "/?created=node-docs", {
+      headers: { cookie: authCookie },
+    });
+    assert.strictEqual(homeRes.status, 200);
+    assert(homeRes.body.includes("/url/node-docs"), "Rendered page should contain new short URL");
+    assert.strictEqual(urlsStore.length, 1, "Reloading should not create duplicate URL");
   });
 
   await test("POST /url rejects duplicate custom alias", async () => {
