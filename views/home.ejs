@@ -292,6 +292,17 @@
                     <span class="field-hint">Comma-separated tags to organize your links</span>
                 </div>
                 <div class="field-group" style="grid-column: span 2;">
+                    <label class="field-label" for="webhookUrl">Click Webhook URL 🔔 (Optional)</label>
+                    <input
+                        type="url"
+                        class="field-input"
+                        id="webhookUrl"
+                        name="webhookUrl"
+                        placeholder="https://your-server.com/webhooks/snipurl"
+                    >
+                    <span class="field-hint">Receives a POST JSON event whenever this link is clicked</span>
+                </div>
+                <div class="field-group" style="grid-column: span 2;">
                     <label class="field-label">UTM Builder (Optional)</label>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
                         <input type="text" class="field-input" name="utmSource" placeholder="utm_source (e.g. twitter)">

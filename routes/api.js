@@ -13,6 +13,7 @@ const {
   aggregate,
 } = require("../controllers/url");
 const { setCachedUrl, delCachedUrl } = require("../service/cache");
+const { validateTargetUrlSafety, isSelfRedirect, isBlockedHost } = require("../service/urlSafety");
 
 const router = express.Router();
 
@@ -33,6 +34,7 @@ router.post("/shorten", urlShortenLimiter, async (req, res) => {
     utmSource,
     utmMedium,
     utmCampaign,
+    webhookUrl,
   } = req.body;
 
   if (!rawUrl || !isValidHttpUrl(rawUrl)) {
@@ -40,6 +42,20 @@ router.post("/shorten", urlShortenLimiter, async (req, res) => {
   }
 
   const originalUrl = appendUtmParams(rawUrl, { utmSource, utmMedium, utmCampaign });
+
+  const safety = await validateTargetUrlSafety(originalUrl, req.get("host"));
+  if (!safety.ok) {
+    return res.status(400).json({ error: safety.error });
+  }
+
+  let cleanWebhookUrl = null;
+  if (webhookUrl && String(webhookUrl).trim()) {
+    const wh = String(webhookUrl).trim();
+    if (!isValidHttpUrl(wh) || isSelfRedirect(wh, req.get("host")) || isBlockedHost(wh)) {
+      return res.status(400).json({ error: "webhookUrl must be a valid external http:// or https:// URL." });
+    }
+    cleanWebhookUrl = wh;
+  }
 
   const existingOriginal = await URL.findOne({ redirectId: originalUrl, createdBy: req.user._id });
   if (existingOriginal) {
@@ -93,6 +109,7 @@ router.post("/shorten", urlShortenLimiter, async (req, res) => {
     maxClicks: parsedMaxClicks,
     passwordHash,
     tags: parsedTags,
+    webhookUrl: cleanWebhookUrl,
   });
 
   await setCachedUrl(shortId, created);
@@ -105,6 +122,7 @@ router.post("/shorten", urlShortenLimiter, async (req, res) => {
     maxClicks: parsedMaxClicks,
     passwordProtected: Boolean(passwordHash),
     tags: parsedTags,
+    webhookUrl: cleanWebhookUrl,
   });
 });
 
@@ -188,18 +206,35 @@ router.get("/analytics/:id", async (req, res) => {
  * PATCH /api/v1/links/:id
  */
 router.patch("/links/:id", async (req, res) => {
-  const { redirectId } = req.body;
+  const { redirectId, webhookUrl } = req.body;
   if (!redirectId || !isValidHttpUrl(redirectId)) {
     return res.status(400).json({ error: "A valid http:// or https:// redirectId is required." });
+  }
+
+  const safety = await validateTargetUrlSafety(redirectId, req.get("host"));
+  if (!safety.ok) {
+    return res.status(400).json({ error: safety.error });
+  }
+
+  let cleanWebhookUrl = null;
+  if (webhookUrl && String(webhookUrl).trim()) {
+    const wh = String(webhookUrl).trim();
+    if (!isValidHttpUrl(wh) || isSelfRedirect(wh, req.get("host")) || isBlockedHost(wh)) {
+      return res.status(400).json({ error: "webhookUrl must be a valid external http:// or https:// URL." });
+    }
+    cleanWebhookUrl = wh;
   }
 
   const doc = await URL.findOne({ shortId: req.params.id, createdBy: req.user._id });
   if (!doc) return res.status(404).json({ error: "Link not found." });
 
-  await URL.updateOne({ shortId: req.params.id }, { redirectId });
+  const updateFields = { redirectId };
+  if (webhookUrl !== undefined) updateFields.webhookUrl = cleanWebhookUrl;
+
+  await URL.updateOne({ shortId: req.params.id }, updateFields);
   await delCachedUrl(req.params.id);
 
-  return res.json({ shortId: doc.shortId, redirectId, updated: true });
+  return res.json({ shortId: doc.shortId, redirectId, webhookUrl: webhookUrl !== undefined ? cleanWebhookUrl : doc.webhookUrl, updated: true });
 });
 
 /**

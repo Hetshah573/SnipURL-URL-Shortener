@@ -60,6 +60,7 @@ const swaggerSpec = {
                   utmSource: { type: "string", example: "twitter" },
                   utmMedium: { type: "string", example: "social" },
                   utmCampaign: { type: "string", example: "launch" },
+                  webhookUrl: { type: "string", example: "https://webhook.site/your-id" },
                 },
               },
             },

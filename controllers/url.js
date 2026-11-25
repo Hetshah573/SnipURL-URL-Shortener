@@ -6,6 +6,8 @@ const geoip    = require("geoip-lite");
 const crypto   = require("crypto");
 const bcrypt   = require("bcryptjs");
 const { getCachedUrl, setCachedUrl, delCachedUrl } = require("../service/cache");
+const { fireClickWebhook } = require("../service/webhook");
+const { validateTargetUrlSafety, isSelfRedirect, isBlockedHost } = require("../service/urlSafety");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -152,6 +154,7 @@ async function handleGenerateNewShortURL(req, res) {
     utmSource,
     utmMedium,
     utmCampaign,
+    webhookUrl,
   } = req.body;
 
   const renderWithError = async (error) => {
@@ -163,6 +166,20 @@ async function handleGenerateNewShortURL(req, res) {
   if (!isValidHttpUrl(rawOriginalUrl)) return renderWithError("Please enter a valid http:// or https:// URL.");
 
   const finalUrl = appendUtmParams(rawOriginalUrl, { utmSource, utmMedium, utmCampaign });
+
+  // Self-redirect loop & malicious URL guard
+  const safety = await validateTargetUrlSafety(finalUrl, req.get("host"));
+  if (!safety.ok) return renderWithError(safety.error);
+
+  // Optional webhook URL validation
+  let cleanWebhookUrl = null;
+  if (webhookUrl && webhookUrl.trim()) {
+    const wh = webhookUrl.trim();
+    if (!isValidHttpUrl(wh) || isSelfRedirect(wh, req.get("host")) || isBlockedHost(wh)) {
+      return renderWithError("Webhook URL must be a valid external http:// or https:// URL.");
+    }
+    cleanWebhookUrl = wh;
+  }
 
   // Check if this user already shortened this exact URL
   const existingOriginal = await URL.findOne({ redirectId: finalUrl, createdBy: req.user._id });
@@ -213,6 +230,7 @@ async function handleGenerateNewShortURL(req, res) {
     maxClicks: parsedMaxClicks,
     passwordHash,
     tags: parsedTags,
+    webhookUrl: cleanWebhookUrl,
   });
 
   await setCachedUrl(shortId, created);
@@ -241,6 +259,7 @@ async function handleRedirectToURL(req, res) {
       isActive: dbDoc.isActive,
       hasPassword: Boolean(dbDoc.passwordHash),
       maxClicks: dbDoc.maxClicks || null,
+      webhookUrl: dbDoc.webhookUrl || null,
     };
     await setCachedUrl(shortId, linkData);
   }
@@ -273,6 +292,14 @@ async function handleRedirectToURL(req, res) {
 
   const visit = buildVisitRecord(req);
   await URL.updateOne({ shortId }, { $push: { visitHistory: visit } });
+
+  if (linkData.webhookUrl) {
+    fireClickWebhook(linkData.webhookUrl, {
+      shortId,
+      redirectId: linkData.redirectId,
+      click: visit,
+    }).catch(() => {});
+  }
 
   return res.redirect(linkData.redirectId);
 }
@@ -307,6 +334,14 @@ async function handleUnlockURL(req, res) {
 
   const visit = buildVisitRecord(req);
   await URL.updateOne({ shortId }, { $push: { visitHistory: visit } });
+
+  if (doc.webhookUrl) {
+    fireClickWebhook(doc.webhookUrl, {
+      shortId,
+      redirectId: doc.redirectId,
+      click: visit,
+    }).catch(() => {});
+  }
 
   return res.redirect(doc.redirectId);
 }
@@ -377,6 +412,7 @@ async function handleAnayticsOfURL(req, res) {
     hasPassword: Boolean(result.passwordHash),
     maxClicks: result.maxClicks || null,
     tags: result.tags || [],
+    webhookUrl: result.webhookUrl || "",
     range,
     qrDataUrl,
     chartDays:    JSON.stringify(chartDays),
@@ -427,16 +463,33 @@ async function handleExportAnalyticsCSV(req, res) {
 
 async function handleEditURL(req, res) {
   const shortId = req.params.id;
-  const { redirectId } = req.body;
+  const { redirectId, webhookUrl } = req.body;
 
   if (!redirectId || !isValidHttpUrl(redirectId)) {
     return res.status(400).render("error", { message: "Please provide a valid http:// or https:// destination URL." });
   }
 
+  const safety = await validateTargetUrlSafety(redirectId, req.get("host"));
+  if (!safety.ok) {
+    return res.status(400).render("error", { message: safety.error });
+  }
+
+  let cleanWebhookUrl = null;
+  if (webhookUrl && webhookUrl.trim()) {
+    const wh = webhookUrl.trim();
+    if (!isValidHttpUrl(wh) || isSelfRedirect(wh, req.get("host")) || isBlockedHost(wh)) {
+      return res.status(400).render("error", { message: "Webhook URL must be a valid external http:// or https:// URL." });
+    }
+    cleanWebhookUrl = wh;
+  }
+
   const result = await URL.findOne({ shortId, createdBy: req.user._id });
   if (!result) return res.status(403).render("error", { message: "Forbidden: You do not own this link." });
 
-  await URL.updateOne({ shortId }, { redirectId });
+  const updateFields = { redirectId };
+  if (webhookUrl !== undefined) updateFields.webhookUrl = cleanWebhookUrl;
+
+  await URL.updateOne({ shortId }, updateFields);
   await delCachedUrl(shortId);
 
   return res.redirect(`/url/analytics/${encodeURIComponent(shortId)}?updated=1`);

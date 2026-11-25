@@ -55,6 +55,11 @@ const urlSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    // Phase 6: Click webhook URL
+    webhookUrl: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );

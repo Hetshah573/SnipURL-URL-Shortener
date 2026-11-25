@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "nodemon index.js",
-    "test": "node tests/phase2.test.js && node tests/integration.test.js && node tests/phase4.test.js && node tests/phase5.test.js"
+    "test": "node tests/phase2.test.js && node tests/integration.test.js && node tests/phase4.test.js && node tests/phase5.test.js && node tests/phase6.test.js"
   },
   "keywords": [],
   "author": "",

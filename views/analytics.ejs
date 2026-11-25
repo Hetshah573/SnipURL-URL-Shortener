@@ -201,7 +201,7 @@
         </div>
     </div>
 
-    <!-- Edit Destination URL -->
+    <!-- Edit Destination URL & Webhook -->
     <form method="POST" action="/url/edit/<%= shortId %>" style="display:flex;gap:0.6rem;margin-bottom:1.25rem;flex-wrap:wrap;">
         <input
             type="url"
@@ -209,9 +209,16 @@
             value="<%= redirectId %>"
             required
             placeholder="https://new-destination.com"
-            style="flex:1;min-width:220px;padding:0.55rem 0.9rem;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.85rem;outline:none;"
+            style="flex:2;min-width:220px;padding:0.55rem 0.9rem;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.85rem;outline:none;"
         >
-        <button type="submit" class="btn-action">✎ Update Destination</button>
+        <input
+            type="url"
+            name="webhookUrl"
+            value="<%= locals.webhookUrl || '' %>"
+            placeholder="Webhook URL (optional)"
+            style="flex:1;min-width:200px;padding:0.55rem 0.9rem;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.85rem;outline:none;"
+        >
+        <button type="submit" class="btn-action">✎ Update Link</button>
     </form>
 
     <!-- Actions -->
