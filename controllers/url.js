@@ -77,6 +77,12 @@ async function handleGenerateNewShortURL(req, res) {
   if (!originalUrl) return renderWithError("Please provide a URL to shorten.");
   if (!isValidHttpUrl(originalUrl)) return renderWithError("Please enter a valid http:// or https:// URL.");
 
+  // Check if this user already shortened this exact URL
+  const existingOriginal = await URL.findOne({ redirectId: originalUrl, createdBy: req.user._id });
+  if (existingOriginal) {
+    return renderWithError(`You already shortened this URL before (/${existingOriginal.shortId}).`);
+  }
+
   // Custom alias
   let shortId;
   if (customAlias && customAlias.trim()) {

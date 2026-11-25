@@ -254,6 +254,19 @@ async function test(label, fn) {
     assert.strictEqual(urlsStore.length, 1, "Reloading should not create duplicate URL");
   });
 
+  await test("POST /url rejects duplicate original URL for the same user", async () => {
+    const res = await request("POST", "/url", {
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: authCookie,
+      },
+      body: "id=https://nodejs.org",
+    });
+    assert.strictEqual(res.status, 200);
+    assert(res.body.includes("already shortened this URL"), "Should alert user that URL exists before");
+    assert.strictEqual(urlsStore.length, 1);
+  });
+
   await test("POST /url rejects duplicate custom alias", async () => {
     const res = await request("POST", "/url", {
       headers: {
