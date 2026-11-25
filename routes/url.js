@@ -3,6 +3,7 @@ const {
   handleGenerateNewShortURL,
   handleRedirectToURL,
   handleAnayticsOfURL,
+  handleEditURL,
   handleDeleteURL,
   handleToggleURL,
 } = require("../controllers/url");
@@ -16,10 +17,13 @@ const router = express.Router();
 // Create short URL
 router.post("/", restrictToLoggedInUserOnly, urlShortenLimiter, handleGenerateNewShortURL);
 
-// Analytics page  (before /:id so "analytics" isn't caught as an id)
+// Analytics page
 router.get("/analytics/:id", restrictToLoggedInUserOnly, handleAnayticsOfURL);
 
-// Delete a URL (POST since HTML forms don't support DELETE)
+// Edit destination URL
+router.post("/edit/:id", restrictToLoggedInUserOnly, handleEditURL);
+
+// Delete a URL
 router.post("/delete/:id", restrictToLoggedInUserOnly, handleDeleteURL);
 
 // Toggle active/inactive

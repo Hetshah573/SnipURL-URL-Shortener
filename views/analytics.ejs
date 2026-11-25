@@ -6,7 +6,12 @@
     <title>Analytics — SnipURL</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js">    document.querySelectorAll('.delete-form').forEach(form => {
+        form.addEventListener('submit', (e) => {
+            if (!confirm('Delete this link permanently?')) e.preventDefault();
+        });
+    });
+</script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -120,6 +125,12 @@
     <div class="page-title">Link Analytics</div>
     <div class="page-sub">Performance breakdown for <strong>/<%- shortId %></strong></div>
 
+    <% if (locals.updated) { %>
+    <div style="margin-bottom:1.25rem;padding:0.75rem 1rem;border-radius:9px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);color:var(--success);font-size:0.85rem;">
+        ✓ Destination URL updated and cache invalidated.
+    </div>
+    <% } %>
+
     <!-- Info Grid -->
     <div class="info-grid">
         <div class="info-row">
@@ -148,13 +159,19 @@
     <!-- Stat cards -->
     <div class="stats-row">
         <div class="stat-card">
-            <div class="stat-label">Total Clicks</div>
-            <div class="stat-value"><%= totalClicks %></div>
+            <div class="stat-label">Human Clicks</div>
+            <div class="stat-value"><%= typeof humanClicks !== 'undefined' ? humanClicks : totalClicks %></div>
+            <div class="stat-sub"><%= typeof botClicks !== 'undefined' ? botClicks : 0 %> bot clicks filtered</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Unique Visitors</div>
             <div class="stat-value cyan"><%= uniqueClicks %></div>
             <div class="stat-sub">by hashed IP</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Requests</div>
+            <div class="stat-value" style="color:var(--text);"><%= totalClicks %></div>
+            <div class="stat-sub">humans + bots</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Status</div>
@@ -168,18 +185,20 @@
                 <% } %>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Repeat Rate</div>
-            <div class="stat-value" style="color:var(--warn);">
-                <% if (totalClicks > 0) { %>
-                    <%= Math.round((1 - uniqueClicks / totalClicks) * 100) %>%
-                <% } else { %>
-                    —
-                <% } %>
-            </div>
-            <div class="stat-sub">returning visitors</div>
-        </div>
     </div>
+
+    <!-- Edit Destination URL -->
+    <form method="POST" action="/url/edit/<%= shortId %>" style="display:flex;gap:0.6rem;margin-bottom:1.25rem;flex-wrap:wrap;">
+        <input
+            type="url"
+            name="redirectId"
+            value="<%= redirectId %>"
+            required
+            placeholder="https://new-destination.com"
+            style="flex:1;min-width:220px;padding:0.55rem 0.9rem;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.85rem;outline:none;"
+        >
+        <button type="submit" class="btn-action">✎ Update Destination</button>
+    </form>
 
     <!-- Actions -->
     <div class="actions-row">
@@ -188,8 +207,7 @@
                 <%= isActive ? '⏸ Pause Link' : '▶ Resume Link' %>
             </button>
         </form>
-        <form method="POST" action="/url/delete/<%= shortId %>" style="display:inline"
-              onsubmit="return confirm('Delete this link permanently?')">
+        <form method="POST" action="/url/delete/<%= shortId %>" class="delete-form" style="display:inline">
             <button type="submit" class="btn-action danger">🗑 Delete Link</button>
         </form>
     </div>
@@ -414,6 +432,11 @@ if (deviceData.length > 0) {
     document.getElementById('deviceChart').parentElement.innerHTML =
         '<div class="empty-state" style="padding:2rem 0;font-size:0.85rem;">No data yet</div>';
 }
+    document.querySelectorAll('.delete-form').forEach(form => {
+        form.addEventListener('submit', (e) => {
+            if (!confirm('Delete this link permanently?')) e.preventDefault();
+        });
+    });
 </script>
 
 </body>

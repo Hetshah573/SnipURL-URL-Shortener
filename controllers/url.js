@@ -4,6 +4,7 @@ const QRCode   = require("qrcode");
 const UAParser = require("ua-parser-js");
 const geoip    = require("geoip-lite");
 const crypto   = require("crypto");
+const { getCachedUrl, setCachedUrl, delCachedUrl } = require("../service/cache");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,14 @@ function getClientIp(req) {
   const forwarded = req.headers["x-forwarded-for"];
   if (forwarded) return forwarded.split(",")[0].trim();
   return req.socket?.remoteAddress || req.ip || "127.0.0.1";
+}
+
+/** Detect bots, crawlers, and preview fetchers from User-Agent */
+const BOT_REGEX = /bot|crawler|spider|slurp|curl|wget|python-requests|python-urllib|node-fetch|axios|postman|insomnia|facebookexternalhit|whatsapp|slackbot|discordbot|twitterbot|linkedinbot|telegrambot|applebot|bingpreview|headlesschrome|phantomjs/i;
+
+function isBotUserAgent(uaString) {
+  if (!uaString) return true;
+  return BOT_REGEX.test(uaString);
 }
 
 /** Classify device type from ua-parser result */
@@ -101,37 +110,65 @@ async function handleGenerateNewShortURL(req, res) {
     if (isNaN(expiry.getTime()) || expiry <= new Date()) return renderWithError("Expiry date must be a valid future date.");
   }
 
-  await URL.create({ shortId, redirectId: originalUrl, visitHistory: [], createdBy: req.user._id, expiresAt: expiry });
+  const created = await URL.create({
+    shortId,
+    redirectId: originalUrl,
+    visitHistory: [],
+    createdBy: req.user._id,
+    expiresAt: expiry,
+  });
+
+  // Warm Redis cache immediately
+  await setCachedUrl(shortId, created);
 
   // Post/Redirect/Get: prevents duplicate link creation when user refreshes the page
   return res.redirect(`/?created=${encodeURIComponent(shortId)}`);
 }
 
-// ─── Redirect + collect analytics ────────────────────────────────────────────
+// ─── Redirect + Redis cache + collect analytics ───────────────────────────────
 
 async function handleRedirectToURL(req, res) {
   const shortId = req.params.id;
   if (!shortId) return res.status(404).render("error", { message: "Page not found." });
 
-  const result = await URL.findOne({ shortId });
+  // 1. Check Redis cache first
+  let linkData = await getCachedUrl(shortId);
 
-  if (!result || !result.isActive) {
+  // 2. Cache miss -> query MongoDB & populate Redis
+  if (!linkData) {
+    const doc = await URL.findOne({ shortId });
+    if (!doc) {
+      return res.status(404).render("error", { message: "This short link does not exist or has been disabled." });
+    }
+    linkData = {
+      shortId: doc.shortId,
+      redirectId: doc.redirectId,
+      expiresAt: doc.expiresAt,
+      isActive: doc.isActive,
+    };
+    await setCachedUrl(shortId, linkData);
+  }
+
+  if (!linkData.isActive) {
     return res.status(404).render("error", { message: "This short link does not exist or has been disabled." });
   }
 
-  if (result.expiresAt && result.expiresAt < new Date()) {
+  const expiryDate = linkData.expiresAt ? new Date(linkData.expiresAt) : null;
+  if (expiryDate && expiryDate < new Date()) {
     return res.status(410).render("error", {
-      message: `This link expired on ${result.expiresAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`,
+      message: `This link expired on ${expiryDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`,
     });
   }
 
-  // ── Collect visitor data ──────────────────────────────────────────────────
-  const ip        = getClientIp(req);
-  const ipHash    = hashIp(ip);
-  const geo       = geoip.lookup(ip) || {};
-  const ua        = new UAParser(req.headers["user-agent"]).getResult();
-  const referrer  = req.headers["referer"] || req.headers["referrer"] || "(direct)";
-  const device    = classifyDevice(ua);
+  // ── Collect visitor data (with bot detection) ─────────────────────────────
+  const uaString = req.headers["user-agent"] || "";
+  const isBot    = isBotUserAgent(uaString);
+  const ip       = getClientIp(req);
+  const ipHash   = hashIp(ip);
+  const geo      = geoip.lookup(ip) || {};
+  const ua       = new UAParser(uaString).getResult();
+  const referrer = req.headers["referer"] || req.headers["referrer"] || "(direct)";
+  const device   = classifyDevice(ua);
 
   const visit = {
     timestamps: Date.now(),
@@ -142,11 +179,12 @@ async function handleRedirectToURL(req, res) {
     os:         ua.os?.name      || "Unknown",
     device,
     referrer:   referrer.length > 200 ? referrer.slice(0, 200) : referrer,
+    isBot,
   };
 
   await URL.updateOne({ shortId }, { $push: { visitHistory: visit } });
 
-  return res.redirect(result.redirectId);
+  return res.redirect(linkData.redirectId);
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
@@ -158,12 +196,14 @@ async function handleAnayticsOfURL(req, res) {
   const result = await URL.findOne({ shortId, createdBy: req.user._id });
   if (!result) return res.status(403).render("error", { message: "Forbidden: You do not own this link." });
 
-  const shortUrl  = buildShortUrl(req, shortId);
-  const history   = result.visitHistory;
+  const shortUrl    = buildShortUrl(req, shortId);
+  const history     = result.visitHistory;
+  const humanVisits = history.filter((v) => !v.isBot);
+  const botClicks   = history.length - humanVisits.length;
   const totalClicks = history.length;
 
-  // Unique clicks (by hashed IP)
-  const uniqueClicks = new Set(history.map((v) => v.ip)).size;
+  // Unique human clicks (by hashed IP)
+  const uniqueClicks = new Set(humanVisits.map((v) => v.ip)).size;
 
   // QR Code
   const qrDataUrl = await QRCode.toDataURL(shortUrl, {
@@ -171,7 +211,7 @@ async function handleAnayticsOfURL(req, res) {
     color: { dark: "#e8e8f0", light: "#18181f" },
   });
 
-  // 7-day chart
+  // 7-day chart (human clicks)
   const now = new Date();
   const chartDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now);
@@ -179,28 +219,29 @@ async function handleAnayticsOfURL(req, res) {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   });
   const chartCounts = new Array(7).fill(0);
-  history.forEach(({ timestamps }) => {
+  humanVisits.forEach(({ timestamps }) => {
     const daysAgo = Math.floor((now - new Date(timestamps)) / 86400000);
     if (daysAgo < 7) chartCounts[6 - daysAgo]++;
   });
 
-  // ── Aggregations ──
-  const topBrowsers  = aggregate(history.map((v) => v.browser));
-  const topOS        = aggregate(history.map((v) => v.os));
-  const topCountries = aggregate(history.map((v) => v.country)).map((e) => ({
+  // ── Aggregations (human visits) ──
+  const topBrowsers  = aggregate(humanVisits.map((v) => v.browser));
+  const topOS        = aggregate(humanVisits.map((v) => v.os));
+  const topCountries = aggregate(humanVisits.map((v) => v.country)).map((e) => ({
     ...e, flag: countryFlag(e.label),
   }));
-  const topReferrers = aggregate(history.map((v) => v.referrer));
+  const topReferrers = aggregate(humanVisits.map((v) => v.referrer));
 
-  // Device breakdown (pie data)
   const deviceCounts = { Desktop: 0, Mobile: 0, Tablet: 0, Other: 0 };
-  history.forEach(({ device }) => { deviceCounts[device] = (deviceCounts[device] || 0) + 1; });
+  humanVisits.forEach(({ device }) => { deviceCounts[device] = (deviceCounts[device] || 0) + 1; });
 
   return res.render("analytics", {
     shortId: result.shortId,
     redirectId: result.redirectId,
     shortUrl,
     totalClicks,
+    humanClicks: humanVisits.length,
+    botClicks,
     uniqueClicks,
     visitHistory: history,
     createdAt: new Date(result.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
@@ -217,7 +258,27 @@ async function handleAnayticsOfURL(req, res) {
     topCountries: JSON.stringify(topCountries),
     topReferrers: JSON.stringify(topReferrers),
     deviceCounts: JSON.stringify(deviceCounts),
+    updated: req.query.updated === "1",
   });
+}
+
+// ─── Edit Destination URL ─────────────────────────────────────────────────────
+
+async function handleEditURL(req, res) {
+  const shortId = req.params.id;
+  const { redirectId } = req.body;
+
+  if (!redirectId || !isValidHttpUrl(redirectId)) {
+    return res.status(400).render("error", { message: "Please provide a valid http:// or https:// destination URL." });
+  }
+
+  const result = await URL.findOne({ shortId, createdBy: req.user._id });
+  if (!result) return res.status(403).render("error", { message: "Forbidden: You do not own this link." });
+
+  await URL.updateOne({ shortId }, { redirectId });
+  await delCachedUrl(shortId); // Invalidate Redis cache
+
+  return res.redirect(`/url/analytics/${encodeURIComponent(shortId)}?updated=1`);
 }
 
 // ─── Delete ───────────────────────────────────────────────────────────────────
@@ -226,6 +287,7 @@ async function handleDeleteURL(req, res) {
   const result = await URL.findOne({ shortId: req.params.id, createdBy: req.user._id });
   if (!result) return res.status(403).render("error", { message: "Forbidden: You do not own this link." });
   await URL.deleteOne({ shortId: req.params.id });
+  await delCachedUrl(req.params.id); // Invalidate Redis cache
   return res.redirect("/?deleted=1");
 }
 
@@ -235,7 +297,7 @@ async function handleToggleURL(req, res) {
   const result = await URL.findOne({ shortId: req.params.id, createdBy: req.user._id });
   if (!result) return res.status(403).render("error", { message: "Forbidden: You do not own this link." });
   await URL.updateOne({ shortId: req.params.id }, { isActive: !result.isActive });
-  // Redirect back to wherever the user came from (analytics or dashboard)
+  await delCachedUrl(req.params.id); // Invalidate Redis cache
   const ref = req.headers.referer || "/";
   return res.redirect(ref);
 }
@@ -244,6 +306,11 @@ module.exports = {
   handleGenerateNewShortURL,
   handleRedirectToURL,
   handleAnayticsOfURL,
+  handleEditURL,
   handleDeleteURL,
   handleToggleURL,
+  isBotUserAgent,
+  isValidHttpUrl,
+  isValidAlias,
+  aggregate,
 };

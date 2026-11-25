@@ -9,7 +9,9 @@ const connectMongoDb = require("./connection.js");
 const staticroute = require("./routes/staticroute.js");
 const urlroute = require("./routes/url");
 const userroute = require("./routes/user.js");
-const { restrictToLoggedInUserOnly, checkAuth } = require("./middlewares/auth.js");
+const apiroute = require("./routes/api.js");
+const { checkAuth } = require("./middlewares/auth.js");
+const { getRedisClient, closeRedis } = require("./service/cache.js");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -47,9 +49,13 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+app.use("/api/v1", apiroute);
 app.use("/url", urlroute);
 app.use("/", checkAuth, staticroute);
 app.use("/user", userroute);
+
+// Initialize Redis connection in background
+getRedisClient();
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
@@ -63,8 +69,9 @@ const server = app.listen(PORT, () => {
 });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
-process.on("SIGTERM", () => {
+process.on("SIGTERM", async () => {
   console.log("SIGTERM received — shutting down gracefully");
+  await closeRedis();
   server.close(() => {
     console.log("HTTP server closed");
     process.exit(0);

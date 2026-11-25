@@ -5,6 +5,7 @@
  * Run: node tests/integration.test.js
  */
 require("dotenv").config();
+process.env.DISABLE_REDIS = "true";
 
 const express = require("express");
 const cookieParser = require("cookie-parser");
