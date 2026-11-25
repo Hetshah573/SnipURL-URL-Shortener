@@ -1,22 +1,31 @@
-const express = require("express")
-const URL =require("../models/url")
-const router = express.Router()
+const express = require("express");
+const URL = require("../models/url");
+const router = express.Router();
 
-router.get("/",async (req,res)=>{
-    if(!req.user) return res.redirect("/login")
-    const allurls= await URL.find({createdBy:req.user._id});
-    return res.render('home',{
-        urls:allurls,
-        name:req.user.name
-    });
-})
+// Home / dashboard — requires auth (redirects handled by checkAuth + route guard)
+router.get("/", async (req, res) => {
+  if (!req.user) return res.redirect("/login");
+  const allurls = await URL.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
+  return res.render("home", {
+    urls: allurls,
+    name: req.user.name,
+    deleted: req.query.deleted === "1",
+  });
+});
 
-router.get("/Signup",(req,res)=>{
-    return res.render("signup")
-})
+// Redirect /Signup → /signup (consistent lowercase)
+router.get("/Signup", (req, res) => res.redirect("/signup"));
 
-router.get("/login",(req,res)=>{
-    return res.render('login')
-})
+// Login & Signup pages (served from staticroute so checkAuth runs & we know logged-in state)
+router.get("/login", (req, res) => {
+  if (req.user) return res.redirect("/"); // already logged in
+  const registered = req.query.registered === "1";
+  return res.render("login", { success: registered ? "Account created! Please log in." : null });
+});
 
-module.exports= router;
+router.get("/signup", (req, res) => {
+  if (req.user) return res.redirect("/"); // already logged in
+  return res.render("signup", {});
+});
+
+module.exports = router;

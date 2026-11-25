@@ -1,33 +1,72 @@
-const express =require("express")
-const cookieParser =require("cookie-parser")
-const connectMongoDb =require("./connection.js")
+require("dotenv").config(); // Must be first — loads .env before anything else
 
-const app=express();
+const express = require("express");
+const cookieParser = require("cookie-parser");
+const helmet = require("helmet");
+const path = require("path");
 
-const URL =require("./models/url.js")
-const staticroute =require("./routes/staticroute.js")
-const urlroute =require("./routes/url")
-const userroute = require("./routes/user.js")
-const path =require("path");
-const {restrictToLoggedInUserOnly,checkAuth} = require("./middlewares/auth.js");
+const connectMongoDb = require("./connection.js");
+const staticroute = require("./routes/staticroute.js");
+const urlroute = require("./routes/url");
+const userroute = require("./routes/user.js");
+const { restrictToLoggedInUserOnly, checkAuth } = require("./middlewares/auth.js");
 
+const app = express();
+const PORT = process.env.PORT || 5000;
 
-connectMongoDb("mongodb://localhost:27017/short-url").then(()=>{
-    console.log("MongoDB connected successfully")
-})
+// ── Database ──────────────────────────────────────────────────────────────────
+connectMongoDb(process.env.MONGO_URI).then(() => {
+  console.log("MongoDB connected successfully");
+}).catch((err) => {
+  console.error("MongoDB connection failed:", err.message);
+  process.exit(1);
+});
 
-app.set("view engine","ejs")
-app.set("views", path.resolve("./views"))
+// ── View engine ───────────────────────────────────────────────────────────────
+app.set("view engine", "ejs");
+app.set("views", path.resolve("./views"));
 
+// ── Security middleware ───────────────────────────────────────────────────────
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"], // Chart.js CDN
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:"],
+      },
+    },
+  })
+);
 
-app.use(express.json())
-app.use(express.urlencoded({extended:false}))
-app.use(cookieParser())
+// ── Body & cookie parsers ─────────────────────────────────────────────────────
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
-app.use("/url",restrictToLoggedInUserOnly,urlroute)
-app.use("/",checkAuth,staticroute)
-app.use("/user",userroute)
+// ── Routes ────────────────────────────────────────────────────────────────────
+app.use("/url", urlroute);
+app.use("/", checkAuth, staticroute);
+app.use("/user", userroute);
 
-app.listen(5000,()=>{
-    console.log("Server running on PORT 5000")
-})
+// ── Global error handler ──────────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err.stack);
+  res.status(500).render("error", { message: "Something went wrong. Please try again." });
+});
+
+// ── Start server ──────────────────────────────────────────────────────────────
+const server = app.listen(PORT, () => {
+  console.log(`Server running on PORT ${PORT}`);
+});
+
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received — shutting down gracefully");
+  server.close(() => {
+    console.log("HTTP server closed");
+    process.exit(0);
+  });
+});

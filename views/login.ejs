@@ -104,19 +104,26 @@
             box-shadow: 0 0 0 3px var(--accent-glow);
         }
 
-        /* ── Error ── */
-        .error-box {
+        /* ── Alerts ── */
+        .error-box, .success-box {
             display: flex;
             align-items: center;
             gap: 0.6rem;
             margin-bottom: 1.25rem;
             padding: 0.75rem 1rem;
             border-radius: 9px;
+            font-size: 0.85rem;
+        }
+        .error-box {
             background: rgba(239, 68, 68, 0.08);
             border: 1px solid rgba(239, 68, 68, 0.3);
             color: var(--danger);
-            font-size: 0.85rem;
             animation: shake 0.35s ease;
+        }
+        .success-box {
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #22c55e;
         }
 
         @keyframes shake {
@@ -169,10 +176,11 @@
         <div class="card-title">Welcome back</div>
         <div class="card-sub">Sign in to manage your links</div>
 
+        <% if (locals.success) { %>
+        <div class="success-box">✓ <%= success %></div>
+        <% } %>
         <% if (locals.error) { %>
-        <div class="error-box" id="errorBox">
-            ⚠ <%= error %>
-        </div>
+        <div class="error-box" id="errorBox">⚠ <%= error %></div>
         <% } %>
 
         <form action="/user/login" method="POST" id="loginForm">
@@ -202,7 +210,7 @@
         </form>
 
         <div class="card-footer">
-            Don't have an account? <a href="/Signup">Create one</a>
+            Don't have an account? <a href="/signup">Create one</a>
         </div>
     </div>
 

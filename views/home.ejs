@@ -3,383 +3,165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SnipURL — Your Smart Link Shortener</title>
-    <meta name="description" content="Shorten, manage and track your URLs in one place with SnipURL.">
+    <title>SnipURL — Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
         :root {
-            --bg: #0f0f13;
-            --surface: #18181f;
-            --surface2: #1f1f2a;
-            --border: #2a2a38;
-            --accent: #6c63ff;
-            --accent-hover: #7d75ff;
-            --accent-glow: rgba(108, 99, 255, 0.25);
-            --text: #e8e8f0;
-            --text-muted: #8888aa;
-            --success: #22c55e;
-            --danger: #ef4444;
-            --warn: #f59e0b;
-            --radius: 12px;
+            --bg: #0f0f13; --surface: #18181f; --surface2: #1f1f2a;
+            --border: #2a2a38; --accent: #6c63ff; --accent-hover: #7d75ff;
+            --accent-glow: rgba(108,99,255,0.25); --text: #e8e8f0;
+            --text-muted: #8888aa; --success: #22c55e; --danger: #ef4444;
+            --warn: #f59e0b; --radius: 12px;
         }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
         /* ── Nav ── */
         nav {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 2rem;
-            height: 62px;
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            backdrop-filter: blur(12px);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 2rem; height: 62px; background: var(--surface);
+            border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
         }
-
-        .nav-brand {
-            font-size: 1.2rem;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            color: var(--text);
-            display: flex;
-            align-items: center;
-            gap: 0.45rem;
-        }
-
+        .nav-brand { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 0.45rem; }
         .nav-brand .dot { color: var(--accent); }
-
-        .nav-right {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .nav-greeting {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
+        .nav-right { display: flex; align-items: center; gap: 1rem; }
+        .nav-greeting { font-size: 0.85rem; color: var(--text-muted); }
         .nav-greeting span { color: var(--text); font-weight: 500; }
-
-        .btn-logout {
-            font-size: 0.8rem;
-            padding: 0.4rem 1rem;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text-muted);
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.2s;
-        }
-
-        .btn-logout:hover {
-            border-color: var(--danger);
-            color: var(--danger);
-        }
+        .btn-logout { font-size: 0.8rem; padding: 0.4rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; text-decoration: none; transition: all 0.2s; }
+        .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
 
         /* ── Layout ── */
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 2.5rem 1.5rem 4rem;
-        }
+        .container { max-width: 980px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
 
         /* ── Hero ── */
-        .hero {
-            text-align: center;
-            margin-bottom: 2.5rem;
-        }
-
-        .hero h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            margin-bottom: 0.4rem;
-        }
-
+        .hero { text-align: center; margin-bottom: 2rem; }
+        .hero h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 0.4rem; }
         .hero h1 .accent { color: var(--accent); }
+        .hero p { color: var(--text-muted); font-size: 0.95rem; }
 
-        .hero p {
-            color: var(--text-muted);
-            font-size: 0.95rem;
-        }
+        /* ── Alerts ── */
+        .alert { margin-bottom: 1.25rem; padding: 0.8rem 1.1rem; border-radius: 9px; font-size: 0.875rem; display: flex; align-items: center; gap: 0.6rem; }
+        .alert-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3); color: var(--danger); }
+        .alert-success { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.3); color: var(--success); }
 
         /* ── Card ── */
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1.75rem;
-        }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; }
 
         /* ── URL form ── */
-        .url-form {
-            display: flex;
-            gap: 0.75rem;
-            align-items: stretch;
-        }
-
+        .url-form { display: flex; gap: 0.75rem; align-items: stretch; }
         .url-form input[type="url"] {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border-radius: 9px;
-            border: 1px solid var(--border);
-            background: var(--surface2);
-            color: var(--text);
-            font-size: 0.92rem;
-            font-family: 'Inter', sans-serif;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            flex: 1; padding: 0.75rem 1rem; border-radius: 9px; border: 1px solid var(--border);
+            background: var(--surface2); color: var(--text); font-size: 0.92rem;
+            font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
         }
-
         .url-form input[type="url"]::placeholder { color: var(--text-muted); }
+        .url-form input[type="url"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
 
-        .url-form input[type="url"]:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-glow);
+        /* ── Advanced options toggle ── */
+        .advanced-toggle {
+            margin-top: 0.75rem; display: flex; align-items: center; gap: 0.4rem;
+            font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none;
+            width: fit-content; border: none; background: none;
         }
+        .advanced-toggle:hover { color: var(--accent); }
+        .advanced-toggle .chevron { transition: transform 0.2s; display: inline-block; }
+        .advanced-toggle.open .chevron { transform: rotate(90deg); }
 
+        .advanced-panel {
+            display: none; margin-top: 1rem; padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+        }
+        .advanced-panel.hidden { display: none; }
+
+        .field-group { display: flex; flex-direction: column; gap: 0.3rem; }
+        .field-label { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .field-input {
+            padding: 0.65rem 0.9rem; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--surface2); color: var(--text); font-size: 0.88rem;
+            font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .field-input::placeholder { color: var(--text-muted); }
+        .field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .field-hint { font-size: 0.72rem; color: var(--text-muted); }
+
+        /* ── Primary button ── */
         .btn-primary {
-            padding: 0.75rem 1.5rem;
-            border-radius: 9px;
-            border: none;
-            background: var(--accent);
-            color: #fff;
-            font-weight: 600;
-            font-size: 0.9rem;
-            font-family: 'Inter', sans-serif;
-            cursor: pointer;
-            transition: background 0.2s, transform 0.15s;
-            white-space: nowrap;
+            padding: 0.75rem 1.5rem; border-radius: 9px; border: none; background: var(--accent);
+            color: #fff; font-weight: 600; font-size: 0.9rem; font-family: 'Inter', sans-serif;
+            cursor: pointer; transition: background 0.2s, transform 0.15s; white-space: nowrap;
         }
-
         .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
         .btn-primary:active { transform: translateY(0); }
 
         /* ── Result banner ── */
-        <% if (locals.id) { %>
         .result-banner {
-            margin-top: 1.25rem;
-            padding: 1rem 1.25rem;
-            border-radius: 9px;
-            background: rgba(34, 197, 94, 0.08);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            flex-wrap: wrap;
+            margin-top: 1.25rem; padding: 1rem 1.25rem; border-radius: 9px;
+            background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.3);
+            display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;
         }
-
-        .result-banner .label {
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--success);
-            margin-bottom: 0.2rem;
-        }
-
-        .result-banner .short-url {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text);
-            word-break: break-all;
-        }
-
-        .btn-copy {
-            padding: 0.5rem 1rem;
-            border-radius: 7px;
-            border: 1px solid var(--success);
-            background: transparent;
-            color: var(--success);
-            font-size: 0.82rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-
-        .btn-copy:hover { background: rgba(34, 197, 94, 0.12); }
-
-        .btn-home {
-            padding: 0.5rem 1rem;
-            border-radius: 7px;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text-muted);
-            font-size: 0.82rem;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-
-        .btn-home:hover { border-color: var(--accent); color: var(--accent); }
-        <% } %>
+        .result-banner .label { font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--success); margin-bottom: 0.2rem; }
+        .result-banner .short-url { font-size: 1rem; font-weight: 600; color: var(--text); word-break: break-all; }
+        .btn-copy { padding: 0.5rem 1rem; border-radius: 7px; border: 1px solid var(--success); background: transparent; color: var(--success); font-size: 0.82rem; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .btn-copy:hover { background: rgba(34,197,94,0.12); }
+        .btn-dash { padding: 0.5rem 1rem; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 0.82rem; font-weight: 500; cursor: pointer; text-decoration: none; transition: all 0.2s; white-space: nowrap; }
+        .btn-dash:hover { border-color: var(--accent); color: var(--accent); }
 
         /* ── Section heading ── */
-        .section-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin: 2.5rem 0 1rem;
-        }
-
-        .section-head h2 {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text);
-        }
-
-        .badge {
-            font-size: 0.72rem;
-            padding: 0.2rem 0.6rem;
-            border-radius: 999px;
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-        }
+        .section-head { display: flex; align-items: center; justify-content: space-between; margin: 2.5rem 0 1rem; }
+        .section-head h2 { font-size: 1rem; font-weight: 600; }
+        .badge { font-size: 0.72rem; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
 
         /* ── Table ── */
-        .table-wrap {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            overflow: hidden;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.875rem;
-        }
-
-        thead tr {
-            background: var(--surface2);
-            border-bottom: 1px solid var(--border);
-        }
-
-        thead th {
-            padding: 0.8rem 1rem;
-            text-align: left;
-            font-size: 0.72rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--text-muted);
-        }
-
-        tbody tr {
-            border-bottom: 1px solid var(--border);
-            transition: background 0.15s;
-        }
-
+        .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        thead tr { background: var(--surface2); border-bottom: 1px solid var(--border); }
+        thead th { padding: 0.8rem 1rem; text-align: left; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+        tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
         tbody tr:last-child { border-bottom: none; }
         tbody tr:hover { background: var(--surface2); }
-
-        tbody td {
-            padding: 0.85rem 1rem;
-            vertical-align: middle;
-        }
-
-        .idx {
-            color: var(--text-muted);
-            font-size: 0.8rem;
-            width: 3rem;
-        }
-
-        .short-link {
-            color: var(--accent);
-            font-weight: 500;
-            text-decoration: none;
-            font-family: 'Courier New', monospace;
-            font-size: 0.85rem;
-            transition: color 0.15s;
-        }
-
+        tbody td { padding: 0.85rem 1rem; vertical-align: middle; }
+        .idx { color: var(--text-muted); font-size: 0.8rem; width: 2.5rem; }
+        .short-link { color: var(--accent); font-weight: 500; text-decoration: none; font-family: 'Courier New', monospace; font-size: 0.85rem; transition: color 0.15s; }
         .short-link:hover { color: var(--accent-hover); text-decoration: underline; }
-
-        .original-url {
-            color: var(--text-muted);
-            max-width: 280px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-size: 0.82rem;
-        }
-
-        .clicks-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.3rem;
-            padding: 0.25rem 0.65rem;
-            border-radius: 999px;
-            font-size: 0.78rem;
-            font-weight: 600;
-        }
-
+        .original-url { color: var(--text-muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem; display: block; }
+        .clicks-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
         .clicks-badge.zero { background: rgba(136,136,170,0.12); color: var(--text-muted); }
         .clicks-badge.low  { background: rgba(245,158,11,0.12);  color: var(--warn); }
         .clicks-badge.high { background: rgba(34,197,94,0.12);   color: var(--success); }
-
         .created-at { color: var(--text-muted); font-size: 0.78rem; }
 
-        .btn-analytics {
-            font-size: 0.75rem;
-            padding: 0.3rem 0.7rem;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text-muted);
-            text-decoration: none;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
+        /* ── Expiry pill ── */
+        .expiry-pill { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 999px; display: inline-block; margin-top: 0.2rem; }
+        .expiry-pill.active { background: rgba(245,158,11,0.12); color: var(--warn); border: 1px solid rgba(245,158,11,0.3); }
+        .expiry-pill.expired { background: rgba(239,68,68,0.12); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
 
-        .btn-analytics:hover { border-color: var(--accent); color: var(--accent); }
+        /* ── Status pill ── */
+        .status-pill { font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 999px; font-weight: 500; }
+        .status-pill.on  { background: rgba(34,197,94,0.12);  color: var(--success); }
+        .status-pill.off { background: rgba(136,136,170,0.12); color: var(--text-muted); }
+
+        /* ── Action buttons ── */
+        .actions { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+        .btn-sm { font-size: 0.72rem; padding: 0.28rem 0.65rem; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); text-decoration: none; cursor: pointer; transition: all 0.2s; white-space: nowrap; font-family: 'Inter', sans-serif; }
+        .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-sm.danger:hover { border-color: var(--danger); color: var(--danger); }
+        .btn-sm.warn:hover { border-color: var(--warn); color: var(--warn); }
 
         /* ── Empty state ── */
-        .empty-state {
-            text-align: center;
-            padding: 3.5rem 2rem;
-            color: var(--text-muted);
-        }
-
+        .empty-state { text-align: center; padding: 3.5rem 2rem; color: var(--text-muted); }
         .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
         .empty-state p { font-size: 0.9rem; }
 
         /* ── Footer ── */
-        footer {
-            text-align: center;
-            padding: 2rem;
-            color: var(--text-muted);
-            font-size: 0.78rem;
-            border-top: 1px solid var(--border);
-            margin-top: 4rem;
-        }
+        footer { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.78rem; border-top: 1px solid var(--border); margin-top: 4rem; }
     </style>
 </head>
 <body>
 
 <nav>
-    <div class="nav-brand">
-        ✂ Snip<span class="dot">URL</span>
-    </div>
+    <div class="nav-brand">✂ Snip<span class="dot">URL</span></div>
     <div class="nav-right">
         <% if (locals.name) { %>
         <span class="nav-greeting">Hello, <span><%= name %></span> 👋</span>
@@ -390,35 +172,76 @@
 
 <div class="container">
 
-    <!-- Hero -->
     <div class="hero">
         <h1>Shorten. Share. <span class="accent">Track.</span></h1>
         <p>Paste your long URL below and get a short, shareable link instantly.</p>
     </div>
 
+    <!-- Alerts -->
+    <% if (locals.error) { %>
+    <div class="alert alert-error">⚠ <%= error %></div>
+    <% } %>
+    <% if (typeof deleted !== 'undefined' && deleted) { %>
+    <div class="alert alert-success">✓ Link deleted successfully.</div>
+    <% } %>
+
     <!-- Shorten Form -->
     <div class="card">
-        <form class="url-form" method="POST" action="/url">
-            <input
-                type="url"
-                name="id"
-                placeholder="https://your-very-long-url.com/goes/here"
-                required
-                id="urlInput"
-            >
-            <button type="submit" class="btn-primary">Shorten →</button>
+        <form method="POST" action="/url" id="shortenForm">
+            <div class="url-form">
+                <input
+                    type="url"
+                    name="id"
+                    placeholder="https://your-very-long-url.com/goes/here"
+                    required
+                    id="urlInput"
+                    value="<%= locals.lastUrl || '' %>"
+                >
+                <button type="submit" class="btn-primary">Shorten →</button>
+            </div>
+
+            <!-- Advanced Options Toggle -->
+            <button type="button" class="advanced-toggle" id="advToggle" onclick="toggleAdvanced()">
+                <span class="chevron">›</span> Advanced options
+            </button>
+
+            <div class="advanced-panel hidden" id="advPanel">
+                <div class="field-group">
+                    <label class="field-label" for="customAlias">Custom Alias</label>
+                    <input
+                        type="text"
+                        class="field-input"
+                        id="customAlias"
+                        name="customAlias"
+                        placeholder="my-brand-name"
+                        maxlength="30"
+                        pattern="[a-zA-Z0-9_\-]{3,30}"
+                    >
+                    <span class="field-hint">3–30 chars · letters, numbers, - or _</span>
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="expiresAt">Expiry Date</label>
+                    <input
+                        type="date"
+                        class="field-input"
+                        id="expiresAt"
+                        name="expiresAt"
+                    >
+                    <span class="field-hint">Leave blank for a permanent link</span>
+                </div>
+            </div>
         </form>
 
         <!-- Result Banner -->
-        <% if (locals.id) { %>
+        <% if (locals.newShortUrl) { %>
         <div class="result-banner" id="resultBanner">
             <div>
                 <div class="label">✓ Your short URL is ready</div>
-                <div class="short-url" id="generatedUrl">http://localhost:5000/url/<%= id %></div>
+                <div class="short-url" id="generatedUrl"><%= newShortUrl %></div>
             </div>
             <div style="display:flex;gap:0.5rem;flex-shrink:0;">
                 <button class="btn-copy" onclick="copyUrl()">Copy Link</button>
-                <a href="/" class="btn-home">← Dashboard</a>
+                <a href="/url/analytics/<%= newShortId %>" class="btn-dash">Analytics ↗</a>
             </div>
         </div>
         <% } %>
@@ -441,38 +264,62 @@
                     <th>Short Link</th>
                     <th>Original URL</th>
                     <th>Clicks</th>
+                    <th>Status</th>
                     <th>Created</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
-                <% urls.forEach((url, index) => { %>
+                <% urls.forEach((url, index) => {
+                    const clicks = url.visitHistory.length;
+                    const cls = clicks === 0 ? 'zero' : clicks < 10 ? 'low' : 'high';
+                    const isExpired = url.expiresAt && url.expiresAt < new Date();
+                %>
                 <tr>
                     <td class="idx"><%= index + 1 %></td>
                     <td>
-                        <a class="short-link" href="/url/<%= url.shortId %>" target="_blank">
-                            /<%= url.shortId %>
-                        </a>
+                        <a class="short-link" href="/url/<%= url.shortId %>" target="_blank">/<%- url.shortId %></a>
+                        <% if (url.expiresAt) { %>
+                        <div>
+                            <span class="expiry-pill <%= isExpired ? 'expired' : 'active' %>">
+                                <%= isExpired ? '⏰ Expired' : '⏳ Expires ' + new Date(url.expiresAt).toLocaleDateString('en-US', {month:'short', day:'numeric'}) %>
+                            </span>
+                        </div>
+                        <% } %>
                     </td>
                     <td>
-                        <span class="original-url" title="<%= url.redirectId %>">
-                            <%= url.redirectId %>
-                        </span>
+                        <span class="original-url" title="<%= url.redirectId %>"><%= url.redirectId %></span>
                     </td>
                     <td>
-                        <%
-                          const clicks = url.visitHistory.length;
-                          const cls = clicks === 0 ? 'zero' : clicks < 10 ? 'low' : 'high';
-                        %>
                         <span class="clicks-badge <%= cls %>">
                             <%= clicks === 0 ? '—' : clicks %>
                         </span>
                     </td>
+                    <td>
+                        <span class="status-pill <%= url.isActive ? 'on' : 'off' %>">
+                            <%= url.isActive ? 'Active' : 'Paused' %>
+                        </span>
+                    </td>
                     <td class="created-at">
-                        <%= new Date(url.createdAt).toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' }) %>
+                        <%= new Date(url.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) %>
                     </td>
                     <td>
-                        <a class="btn-analytics" href="/url/analytics/<%= url.shortId %>">Analytics ↗</a>
+                        <div class="actions">
+                            <a class="btn-sm" href="/url/analytics/<%= url.shortId %>">Analytics ↗</a>
+
+                            <!-- Toggle active/pause -->
+                            <form method="POST" action="/url/toggle/<%= url.shortId %>" style="display:inline">
+                                <button type="submit" class="btn-sm warn">
+                                    <%= url.isActive ? 'Pause' : 'Resume' %>
+                                </button>
+                            </form>
+
+                            <!-- Delete -->
+                            <form method="POST" action="/url/delete/<%= url.shortId %>" style="display:inline"
+                                  onsubmit="return confirm('Delete this link permanently?')">
+                                <button type="submit" class="btn-sm danger">Delete</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 <% }) %>
@@ -490,21 +337,51 @@
 
 </div>
 
-<footer>
-    SnipURL &nbsp;·&nbsp; Built with Node.js, Express &amp; MongoDB
-</footer>
+<footer>SnipURL &nbsp;·&nbsp; Built with Node.js, Express &amp; MongoDB</footer>
 
 <script>
+    // ── Copy URL ──
     function copyUrl() {
         const url = document.getElementById('generatedUrl')?.innerText;
         if (!url) return;
         navigator.clipboard.writeText(url).then(() => {
             const btn = document.querySelector('.btn-copy');
-            btn.textContent = 'Copied!';
+            btn.textContent = '✓ Copied!';
             btn.style.background = 'rgba(34,197,94,0.15)';
             setTimeout(() => { btn.textContent = 'Copy Link'; btn.style.background = ''; }, 2000);
         });
     }
+
+    // ── Advanced options toggle ──
+    function toggleAdvanced() {
+        const panel = document.getElementById('advPanel');
+        const toggle = document.getElementById('advToggle');
+        const isHidden = panel.classList.contains('hidden');
+        panel.classList.toggle('hidden');
+        toggle.classList.toggle('open', isHidden);
+    }
+
+    // ── Set min date for expiry to tomorrow ──
+    const dateInput = document.getElementById('expiresAt');
+    if (dateInput) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        dateInput.min = tomorrow.toISOString().split('T')[0];
+    }
+
+    // ── Auto-open advanced panel if error was about alias/expiry ──
+    <% if (locals.error && (error.includes('alias') || error.includes('Expiry') || error.includes('expiry'))) { %>
+    toggleAdvanced();
+    <% } %>
+
+    // ── Auto-dismiss alerts ──
+    setTimeout(() => {
+        document.querySelectorAll('.alert-success').forEach(el => {
+            el.style.transition = 'opacity 0.5s';
+            el.style.opacity = '0';
+            setTimeout(() => el.remove(), 500);
+        });
+    }, 4000);
 </script>
 
 </body>
