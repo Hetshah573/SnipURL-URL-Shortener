@@ -172,6 +172,16 @@ async function test(label, fn) {
     assert.strictEqual(res.headers.location, "/login");
   });
 
+  await test("GET /signup and GET /Signup render signup page without redirect loop", async () => {
+    const res1 = await request("GET", "/signup");
+    assert.strictEqual(res1.status, 200);
+    assert(res1.body.includes("Create your account"), "signup page should render");
+
+    const res2 = await request("GET", "/Signup");
+    assert.strictEqual(res2.status, 200);
+    assert(res2.body.includes("Create your account"), "/Signup should also render without redirect loop");
+  });
+
   await test("Unauthenticated POST /url redirects to /login", async () => {
     const res = await request("POST", "/url", {
       headers: { "content-type": "application/x-www-form-urlencoded" },

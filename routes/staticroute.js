@@ -13,9 +13,6 @@ router.get("/", async (req, res) => {
   });
 });
 
-// Redirect /Signup → /signup (consistent lowercase)
-router.get("/Signup", (req, res) => res.redirect("/signup"));
-
 // Login & Signup pages (served from staticroute so checkAuth runs & we know logged-in state)
 router.get("/login", (req, res) => {
   if (req.user) return res.redirect("/"); // already logged in
