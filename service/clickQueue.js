@@ -4,7 +4,7 @@ const logger = require("./logger");
 const { isRedisReady } = require("./cache");
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
-const QUEUE_NAME = "snipurl-click-logs";
+const QUEUE_NAME = process.env.CLICK_QUEUE_NAME || "snipurl-click-logs";
 
 let clickQueue = null;
 let clickWorker = null;

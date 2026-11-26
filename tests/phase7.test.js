@@ -9,6 +9,7 @@
  * Run: node tests/phase7.test.js
  */
 require("dotenv").config();
+process.env.CLICK_QUEUE_NAME = "snipurl-click-logs-test";
 
 const express = require("express");
 const cookieParser = require("cookie-parser");
@@ -165,7 +166,10 @@ async function test(label, fn) {
     redis.once("ready", () => { clearTimeout(timer); resolve(); });
     redis.once("error", () => { clearTimeout(timer); resolve(); });
   });
-  initClickQueue();
+  const qInfo = initClickQueue();
+  if (qInfo?.worker) {
+    await qInfo.worker.waitUntilReady().catch(() => {});
+  }
 
   console.log(`\n${B("━━━ Phase 7: Zod Schema Validation ━━━")}`);
 
@@ -272,7 +276,7 @@ async function test(label, fn) {
     const result = await enqueueClickLog("bullmq-demo", visit);
     if (redis && redis.status === "ready") {
       assert.strictEqual(result.queued, true, "Expected job to be queued via BullMQ");
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < 60; i++) {
         const doc = urlsStore.find((u) => u.shortId === "bullmq-demo");
         if (doc && doc.visitHistory.length === 1) break;
         await new Promise((r) => setTimeout(r, 100));
