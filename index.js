@@ -13,32 +13,39 @@ const urlroute = require("./routes/url");
 const userroute = require("./routes/user.js");
 const apiroute = require("./routes/api.js");
 const { checkAuth } = require("./middlewares/auth.js");
+const { csrfProtection } = require("./middlewares/csrf.js");
+const requestLogger = require("./middlewares/requestLogger.js");
 const { getRedisClient, isRedisReady, closeRedis } = require("./service/cache.js");
+const { initClickQueue, closeClickQueue } = require("./service/clickQueue.js");
+const logger = require("./service/logger.js");
 const swaggerSpec = require("./service/swagger.js");
 
 const app = express();
-app.set("trust proxy", 1); // Required behind reverse proxies (Render, Railway, Nginx, Cloudflare)
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5000;
 
 // ── Database ──────────────────────────────────────────────────────────────────
-connectMongoDb(process.env.MONGO_URI).then(() => {
-  console.log("MongoDB connected successfully");
-}).catch((err) => {
-  console.error("MongoDB connection failed:", err.message);
-  process.exit(1);
-});
+connectMongoDb(process.env.MONGO_URI)
+  .then(() => {
+    logger.info("MongoDB connected successfully");
+  })
+  .catch((err) => {
+    logger.error({ err: err.message }, "MongoDB connection failed");
+    process.exit(1);
+  });
 
 // ── View engine ───────────────────────────────────────────────────────────────
 app.set("view engine", "ejs");
 app.set("views", path.resolve("./views"));
 
-// ── Security middleware ───────────────────────────────────────────────────────
+// ── Security & Logging middleware ─────────────────────────────────────────────
+app.use(requestLogger);
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"], // Chart.js CDN
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:"],
@@ -47,10 +54,11 @@ app.use(
   })
 );
 
-// ── Body & cookie parsers ─────────────────────────────────────────────────────
+// ── Body, cookie & CSRF parsers ───────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+app.use(csrfProtection);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.get("/health", (req, res) => {
@@ -66,26 +74,29 @@ app.use("/url", urlroute);
 app.use("/", checkAuth, staticroute);
 app.use("/user", userroute);
 
-// Initialize Redis connection in background
+// Initialize Redis cache & BullMQ async click worker
 getRedisClient();
+initClickQueue();
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
-  console.error("Unhandled error:", err.stack);
+  const log = req.log || logger;
+  log.error({ err: err.stack }, "Unhandled error");
   res.status(500).render("error", { message: "Something went wrong. Please try again." });
 });
 
 // ── Start server ──────────────────────────────────────────────────────────────
 const server = app.listen(PORT, () => {
-  console.log(`Server running on PORT ${PORT}`);
+  logger.info({ port: PORT }, "Server running");
 });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
 process.on("SIGTERM", async () => {
-  console.log("SIGTERM received — shutting down gracefully");
+  logger.info("SIGTERM received — shutting down gracefully");
+  await closeClickQueue();
   await closeRedis();
   server.close(() => {
-    console.log("HTTP server closed");
+    logger.info("HTTP server closed");
     process.exit(0);
   });
 });

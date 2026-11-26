@@ -8,6 +8,8 @@ const bcrypt   = require("bcryptjs");
 const { getCachedUrl, setCachedUrl, delCachedUrl } = require("../service/cache");
 const { fireClickWebhook } = require("../service/webhook");
 const { validateTargetUrlSafety, isSelfRedirect, isBlockedHost } = require("../service/urlSafety");
+const { enqueueClickLog } = require("../service/clickQueue");
+const { createUrlSchema, editUrlSchema } = require("../validators/schemas");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -144,26 +146,40 @@ function buildVisitRecord(req) {
 // ─── Create short URL ─────────────────────────────────────────────────────────
 
 async function handleGenerateNewShortURL(req, res) {
+  const renderWithError = async (error) => {
+    const urls = await URL.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
+    return res.render("home", { urls, name: req.user.name, error });
+  };
+
+  const parsed = createUrlSchema.safeParse({
+    url: req.body.id,
+    customAlias: req.body.customAlias,
+    expiresAt: req.body.expiresAt,
+    maxClicks: req.body.maxClicks,
+    linkPassword: req.body.linkPassword,
+    tags: req.body.tags,
+    utmSource: req.body.utmSource,
+    utmMedium: req.body.utmMedium,
+    utmCampaign: req.body.utmCampaign,
+    webhookUrl: req.body.webhookUrl,
+  });
+
+  if (!parsed.success) {
+    return renderWithError(parsed.error.issues[0]?.message || "Invalid input.");
+  }
+
   const {
-    id: rawOriginalUrl,
+    url: rawOriginalUrl,
     customAlias,
     expiresAt,
-    maxClicks,
+    maxClicks: parsedMaxClicks,
     linkPassword,
     tags,
     utmSource,
     utmMedium,
     utmCampaign,
     webhookUrl,
-  } = req.body;
-
-  const renderWithError = async (error) => {
-    const urls = await URL.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
-    return res.render("home", { urls, name: req.user.name, error });
-  };
-
-  if (!rawOriginalUrl) return renderWithError("Please provide a URL to shorten.");
-  if (!isValidHttpUrl(rawOriginalUrl)) return renderWithError("Please enter a valid http:// or https:// URL.");
+  } = parsed.data;
 
   const finalUrl = appendUtmParams(rawOriginalUrl, { utmSource, utmMedium, utmCampaign });
 
@@ -205,18 +221,10 @@ async function handleGenerateNewShortURL(req, res) {
     if (isNaN(expiry.getTime()) || expiry <= new Date()) return renderWithError("Expiry date must be a valid future date.");
   }
 
-  // Max-click limit
-  let parsedMaxClicks = null;
-  if (maxClicks && String(maxClicks).trim()) {
-    const n = parseInt(maxClicks, 10);
-    if (isNaN(n) || n < 1) return renderWithError("Max clicks must be a positive number.");
-    parsedMaxClicks = n;
-  }
-
   // Optional password protection
   let passwordHash = null;
-  if (linkPassword && linkPassword.trim()) {
-    passwordHash = await bcrypt.hash(linkPassword.trim(), 10);
+  if (linkPassword) {
+    passwordHash = await bcrypt.hash(linkPassword, 10);
   }
 
   const parsedTags = parseTags(tags);
@@ -227,7 +235,7 @@ async function handleGenerateNewShortURL(req, res) {
     visitHistory: [],
     createdBy: req.user._id,
     expiresAt: expiry,
-    maxClicks: parsedMaxClicks,
+    maxClicks: parsedMaxClicks ?? null,
     passwordHash,
     tags: parsedTags,
     webhookUrl: cleanWebhookUrl,
@@ -291,7 +299,7 @@ async function handleRedirectToURL(req, res) {
   }
 
   const visit = buildVisitRecord(req);
-  await URL.updateOne({ shortId }, { $push: { visitHistory: visit } });
+  enqueueClickLog(shortId, visit).catch(() => {});
 
   if (linkData.webhookUrl) {
     fireClickWebhook(linkData.webhookUrl, {
@@ -333,7 +341,7 @@ async function handleUnlockURL(req, res) {
   }
 
   const visit = buildVisitRecord(req);
-  await URL.updateOne({ shortId }, { $push: { visitHistory: visit } });
+  enqueueClickLog(shortId, visit).catch(() => {});
 
   if (doc.webhookUrl) {
     fireClickWebhook(doc.webhookUrl, {
@@ -463,11 +471,11 @@ async function handleExportAnalyticsCSV(req, res) {
 
 async function handleEditURL(req, res) {
   const shortId = req.params.id;
-  const { redirectId, webhookUrl } = req.body;
-
-  if (!redirectId || !isValidHttpUrl(redirectId)) {
-    return res.status(400).render("error", { message: "Please provide a valid http:// or https:// destination URL." });
+  const parsed = editUrlSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).render("error", { message: parsed.error.issues[0]?.message || "Invalid URL." });
   }
+  const { redirectId, webhookUrl } = parsed.data;
 
   const safety = await validateTargetUrlSafety(redirectId, req.get("host"));
   if (!safety.ok) {

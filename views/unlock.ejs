@@ -79,6 +79,7 @@
         <% } %>
 
         <form method="POST" action="/url/<%= shortId %>/unlock">
+            <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
             <input type="password" name="password" placeholder="Enter link password" required autofocus>
             <button type="submit">Unlock &amp; Continue →</button>
         </form>

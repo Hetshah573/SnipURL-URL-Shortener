@@ -14,6 +14,7 @@ const {
 } = require("../controllers/url");
 const { setCachedUrl, delCachedUrl } = require("../service/cache");
 const { validateTargetUrlSafety, isSelfRedirect, isBlockedHost } = require("../service/urlSafety");
+const { createUrlSchema, editUrlSchema } = require("../validators/schemas");
 
 const router = express.Router();
 
@@ -24,22 +25,35 @@ router.use(authenticateApiKey);
  * POST /api/v1/shorten
  */
 router.post("/shorten", urlShortenLimiter, async (req, res) => {
+  const parsed = createUrlSchema.safeParse({
+    url: req.body.url,
+    customAlias: req.body.customAlias,
+    expiresAt: req.body.expiresAt,
+    maxClicks: req.body.maxClicks,
+    linkPassword: req.body.password,
+    tags: req.body.tags,
+    utmSource: req.body.utmSource,
+    utmMedium: req.body.utmMedium,
+    utmCampaign: req.body.utmCampaign,
+    webhookUrl: req.body.webhookUrl,
+  });
+
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid request payload." });
+  }
+
   const {
     url: rawUrl,
     customAlias,
     expiresAt,
-    maxClicks,
-    password,
+    maxClicks: parsedMaxClicks,
+    linkPassword: password,
     tags,
     utmSource,
     utmMedium,
     utmCampaign,
     webhookUrl,
-  } = req.body;
-
-  if (!rawUrl || !isValidHttpUrl(rawUrl)) {
-    return res.status(400).json({ error: "A valid http:// or https:// url is required." });
-  }
+  } = parsed.data;
 
   const originalUrl = appendUtmParams(rawUrl, { utmSource, utmMedium, utmCampaign });
 
@@ -88,16 +102,7 @@ router.post("/shorten", urlShortenLimiter, async (req, res) => {
     }
   }
 
-  let parsedMaxClicks = null;
-  if (maxClicks !== undefined && maxClicks !== null && maxClicks !== "") {
-    const n = parseInt(maxClicks, 10);
-    if (isNaN(n) || n < 1) {
-      return res.status(400).json({ error: "maxClicks must be a positive integer." });
-    }
-    parsedMaxClicks = n;
-  }
-
-  const passwordHash = password && String(password).trim() ? await bcrypt.hash(String(password).trim(), 10) : null;
+  const passwordHash = password ? await bcrypt.hash(password, 10) : null;
   const parsedTags = parseTags(tags);
 
   const created = await URL.create({
@@ -106,7 +111,7 @@ router.post("/shorten", urlShortenLimiter, async (req, res) => {
     visitHistory: [],
     createdBy: req.user._id,
     expiresAt: expiry,
-    maxClicks: parsedMaxClicks,
+    maxClicks: parsedMaxClicks ?? null,
     passwordHash,
     tags: parsedTags,
     webhookUrl: cleanWebhookUrl,
@@ -206,10 +211,11 @@ router.get("/analytics/:id", async (req, res) => {
  * PATCH /api/v1/links/:id
  */
 router.patch("/links/:id", async (req, res) => {
-  const { redirectId, webhookUrl } = req.body;
-  if (!redirectId || !isValidHttpUrl(redirectId)) {
-    return res.status(400).json({ error: "A valid http:// or https:// redirectId is required." });
+  const parsed = editUrlSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid request payload." });
   }
+  const { redirectId, webhookUrl } = parsed.data;
 
   const safety = await validateTargetUrlSafety(redirectId, req.get("host"));
   if (!safety.ok) {

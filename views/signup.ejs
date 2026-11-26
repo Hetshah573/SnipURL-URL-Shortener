@@ -227,6 +227,7 @@
         <div class="divider">Get started</div>
 
         <form action="/user" method="POST" id="signupForm">
+            <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
             <div class="form-group">
                 <label for="name">Full Name</label>
                 <input

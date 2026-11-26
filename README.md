@@ -1,6 +1,6 @@
 # ✂ SnipURL — Production-Grade URL Shortener
 
-> A full-stack URL shortening web app built with **Node.js**, **Express v5**, **MongoDB**, **Redis**, and **EJS** — featuring JWT authentication, bcrypt password hashing, rate limiting, Redis redirect caching, bot filtering, custom aliases, link expiry, QR codes, rich analytics, and a REST API.
+> A full-stack URL shortening platform built with **Node.js**, **Express v5**, **MongoDB**, **Redis / BullMQ**, and **EJS** — featuring JWT & bcrypt auth, CSRF protection, Zod validation, Pino structured logging, Redis caching, async click queueing, webhooks, QR codes, rich analytics, and a Swagger-documented REST API.
 
 ---
 
@@ -10,17 +10,20 @@
 |---|---|
 | 🔗 URL Shortening | Shorten any `http://` or `https://` URL with duplicate-per-user protection & PRG reload safety |
 | 🏷️ Custom Aliases | Optional 3–30 character slugs (`/url/my-brand`) with uniqueness validation |
-| ⏳ Link Expiry | Optional expiration date per link — expired links return `410 Gone` |
-| ✏️ Edit, Pause & Delete | Update destination URL (`POST /url/edit/:id`), pause/resume (`isActive`), or delete permanently |
-| ⚡ Redis Caching | `ioredis` caches `shortId → redirectId` (with automatic invalidation on edit/toggle/delete and graceful fallback) |
+| ⏳ Date & Max-Click Expiry | Optional expiration date or max click limit per link — expired links return `410 Gone` |
+| 🔒 Password-Protected Links | Optional bcrypt-hashed link password with `/url/:id/unlock` prompt |
+| ✏️ Edit, Pause & Delete | Update destination/webhook (`POST /url/edit/:id`), pause/resume (`isActive`), or delete permanently |
+| ⚡ Redis Caching + BullMQ | `ioredis` caches `shortId → redirectId` (0 DB `findOne` lookups on hit); BullMQ queues click logs asynchronously |
 | 🤖 Bot Filtering | Separates human clicks from bots/crawlers (`Googlebot`, `curl`, `Slackbot`, `WhatsApp`, etc.) |
-| 📱 QR Code Generation | Server-side dark-themed QR code PNG on every link's analytics page with download |
-| 🔍 Search, Sort & Pagination | Filter links by alias/URL (`?q=`), sort (`newest`, `oldest`, `most_clicked`), and paginate (`?page=`) |
-| 🔑 Developer REST API | Per-user API keys (`Authorization: Bearer <key>`) for `/api/v1/*` endpoints |
-| 🔐 JWT & bcrypt Auth | `bcryptjs` password hashing, stateless JWT in `httpOnly` `token` cookie, timing-safe login, logout |
-| 🛡️ Security Hardening | `helmet` CSP/security headers, `express-rate-limit` on login/signup/shorten, global error handler |
-| 📊 Rich Visitor Analytics | Country & city (`geoip-lite`), browser/OS/device (`ua-parser-js`), referrer, hashed IP, Chart.js graphs |
-| 🧪 Automated Tests | 84 unit/schema tests + 14 HTTP integration tests + 12 Phase 4 & live Redis tests (`npm test`) |
+| 🔔 Click Webhooks | Optional `webhookUrl` fires non-blocking `POST` JSON (`X-SnipURL-Event: link.clicked`) on every click |
+| 🛡️ URL Safety Guard | Blocks self-redirects, cloud metadata IPs (`169.254.169.254`), and optional Google Safe Browsing v4 check |
+| 🏷️ Tags & UTM Builder | Organize links with `#tags` (`?tag=`) and auto-append `utm_source`, `utm_medium`, `utm_campaign` |
+| 📱 QR Code & CSV Export | Dark-themed QR code PNG download, date-range filter (`24h`/`7d`/`30d`/`all`), formula-safe CSV export |
+| 🔍 Search, Sort & Pagination | Filter links by alias/URL/tag (`?q=`, `?tag=`), sort (`newest`, `oldest`, `most_clicked`), paginate (`?page=`) |
+| 🔑 REST API & Swagger Docs | Per-user SHA-256 API keys (`/api/v1/*`) + interactive OpenAPI 3.0 docs at `/api-docs` |
+| 🔐 Security & Observability | `bcryptjs`, `httpOnly` JWT, `helmet`, `express-rate-limit`, double-submit CSRF, `zod`, `pino` + `X-Request-Id` |
+| 🐳 Docker & Cloud Ready | `Dockerfile`, `docker-compose.yml`, `trust proxy`, `GET /health`, and Upstash `rediss://` TLS support |
+| 🧪 Automated Tests | **138 tests** across 6 suites (`npm test`) |
 
 ---
 
@@ -29,127 +32,98 @@
 ```
 15_URL_Shortener_EJS_Authentication/
 │
-├── index.js                   # Entry point — dotenv, Helmet CSP, routes, Redis init, error handler, graceful shutdown
+├── index.js                   # Entry point — Pino, Helmet CSP, CSRF, Swagger, routes, BullMQ, /health
 ├── connection.js              # MongoDB connection via Mongoose
-├── package.json               # Scripts: start (nodemon), test (unit + integration + phase4/redis)
+├── package.json               # Scripts: start (nodemon), test (138 tests across 6 suites)
+├── Dockerfile                 # Production container image
+├── docker-compose.yml         # App + MongoDB + Redis stack
 ├── .env                       # Environment config (ignored by git)
 │
 ├── models/
-│   ├── url.js                 # URL Schema (shortId, redirectId, expiresAt, isActive, visitHistory + isBot)
+│   ├── url.js                 # URL Schema (shortId, redirectId, expiresAt, maxClicks, passwordHash, tags, webhookUrl, visitHistory)
 │   └── user.js                # User Schema (name, email, hashed password, apiKeyHash, apiKeyPrefix)
 │
+├── validators/
+│   └── schemas.js             # Zod validation schemas (signup, login, createUrl, editUrl)
+│
 ├── controllers/
-│   ├── url.js                 # Shorten, Redis-cached redirect + bot/geo/UA telemetry, analytics + QR, edit, toggle, delete
+│   ├── url.js                 # Shorten, Redis-cached redirect, unlock, BullMQ enqueue, analytics, CSV export, edit, toggle, delete
 │   └── user.js                # Signup (bcrypt), login (JWT httpOnly cookie), logout, API key generate/revoke
 │
 ├── routes/
-│   ├── staticroute.js         # GET / (search, sort, pagination), /login, /signup
-│   ├── url.js                 # POST /url, GET /url/analytics/:id, POST /url/edit/:id, toggle, delete, GET /url/:id
-│   ├── user.js                # POST /user, POST /user/login, GET /user/logout, POST /user/api-key(/revoke)
+│   ├── staticroute.js         # GET / (search, tag, sort, pagination), /login, /signup
+│   ├── url.js                 # POST /url, analytics, export, edit, toggle, delete, unlock, GET /url/:id
+│   ├── user.js                # POST /user, /user/login, GET /user/logout, POST /user/api-key(/revoke)
 │   └── api.js                 # REST API v1 (/api/v1/shorten, /links, /analytics/:id)
 │
 ├── middlewares/
-│   ├── auth.js                # restrictToLoggedInUserOnly, checkAuth (reads JWT token cookie)
+│   ├── auth.js                # restrictToLoggedInUserOnly, checkAuth (JWT token cookie)
 │   ├── apiAuth.js             # authenticateApiKey (SHA-256 lookup from Bearer / x-api-key)
-│   └── rateLimiter.js         # loginLimiter (10/15m), signupLimiter (5/hr), urlShortenLimiter (30/15m)
+│   ├── csrf.js                # Double-submit cookie CSRF protection
+│   ├── rateLimiter.js         # loginLimiter (10/15m), signupLimiter (5/hr), urlShortenLimiter (30/15m)
+│   └── requestLogger.js       # Pino child logger + X-Request-Id header
 │
 ├── service/
-│   ├── auth.js                # Stateless JWT sign & verify (setUser / getUser)
-│   └── cache.js               # Redis caching layer (getCachedUrl, setCachedUrl, delCachedUrl)
+│   ├── auth.js                # Stateless JWT sign & verify
+│   ├── cache.js               # Redis caching layer (ioredis)
+│   ├── clickQueue.js          # BullMQ async click logging queue & worker (supports rediss:// TLS)
+│   ├── logger.js              # Pino JSON logger
+│   ├── swagger.js             # OpenAPI 3.0 specification
+│   ├── urlSafety.js           # Self-redirect, metadata SSRF, & Google Safe Browsing checks
+│   └── webhook.js             # Async POST JSON click webhook dispatcher
 │
 ├── views/                     # EJS templates
-│   ├── home.ejs               # Dashboard — shorten form, search/sort/pagination, links table, API key panel
-│   ├── analytics.ejs          # Human vs bot stats, edit destination, QR code, Chart.js graphs, leaderboards
-│   ├── login.ejs              # Login form with error & registration success banners
-│   ├── signup.ejs             # Signup form with validation error banner
-│   └── error.ejs              # Friendly error page (400, 403, 404, 410, 500)
+│   ├── home.ejs               # Dashboard — shorten form, advanced options, search/tags/pagination, API key panel
+│   ├── analytics.ejs          # Human vs bot stats, range filter, CSV export, edit destination/webhook, QR, Chart.js
+│   ├── unlock.ejs             # Password prompt for protected short links
+│   ├── login.ejs              # Login form
+│   ├── signup.ejs             # Signup form
+│   └── error.ejs              # Error page (400, 403, 404, 410, 500)
 │
 └── tests/
-    ├── phase2.test.js         # 84 unit & schema validation tests
-    ├── integration.test.js    # 14 in-process HTTP integration tests
-    └── phase4.test.js         # 12 Phase 4 + live Docker Redis cache hit/invalidation tests
+    ├── phase2.test.js         # 84 unit & schema tests
+    ├── integration.test.js    # 14 HTTP integration tests
+    ├── phase4.test.js         # 12 Redis cache hit/invalidation & REST API tests
+    ├── phase5.test.js         # 12 Docker, Swagger, password/max-click, tags, UTM, CSV tests
+    ├── phase6.test.js         # 6 webhook & URL safety guard tests
+    └── phase7.test.js         # 10 BullMQ queue, Pino request ID, Zod, & CSRF tests
 ```
-
----
-
-## 📦 Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Runtime | Node.js (v18+) |
-| Framework | Express.js v5 |
-| Database & Cache | MongoDB + Mongoose v8, Redis (`ioredis`) |
-| View Engine | EJS v6 + Chart.js v4 (CDN) |
-| Auth & Security | `jsonwebtoken`, `bcryptjs`, `helmet`, `express-rate-limit`, `dotenv` |
-| Analytics & QR | `ua-parser-js`, `geoip-lite`, `qrcode`, `shortid` |
 
 ---
 
 ## ⚙️ Setup & Installation
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v18+ recommended)
-- [MongoDB](https://www.mongodb.com/try/download/community) running locally on port `27017`
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (optional, for Redis caching — app falls back gracefully if Redis is unavailable)
-
-### Steps
-
+### Option A: Local / Hosted Redis (Upstash)
 ```bash
-# 1. Clone the repository
 git clone https://github.com/Hetshah573/SnipURL-URL-Shortener.git
 cd SnipURL-URL-Shortener
-
-# 2. Install dependencies
 npm install
+```
 
-# 3. Start Redis via Docker (recommended)
-docker run -d --name snipurl-redis -p 6379:6379 --restart unless-stopped redis:alpine
-
-# 4. Create a .env file in the project root
+Create a `.env` file in the project root:
+```env
 PORT=5000
 MONGO_URI=mongodb://localhost:27017/short-url
 JWT_SECRET=replace_with_a_long_random_secret_string
 JWT_EXPIRES_IN=7d
-REDIS_URL=redis://localhost:6379
+REDIS_URL=rediss://default:<password>@<host>:<port>   # or redis://localhost:6379
+# Optional:
+# APP_HOST=yourdomain.com
+# GOOGLE_SAFE_BROWSING_API_KEY=your_api_key
+```
 
-# 5. Run the test suite
+Run tests and start:
+```bash
 npm test
-
-# 6. Start the development server
 npm start
 ```
 
-Open `http://localhost:5000` in your browser.
+### Option B: Docker Compose (App + MongoDB + Redis)
+```bash
+docker compose up --build
+```
 
----
-
-## 🌐 Route & REST API Reference
-
-### Web Routes
-| Method | Path | Auth | Rate Limit | Description |
-|---|---|---|---|---|
-| `GET` | `/` | ✅ Cookie | — | Dashboard (`?q=`, `?sort=`, `?page=`) |
-| `GET` | `/login`, `/signup` | ❌ | — | Auth pages |
-| `POST` | `/user`, `/user/login` | ❌ | 5/hr, 10/15m | Signup (bcrypt) & Login (`httpOnly` JWT) |
-| `GET` | `/user/logout` | ❌ | — | Clear auth cookie |
-| `POST` | `/user/api-key`, `/user/api-key/revoke` | ✅ Cookie | — | Generate/regenerate or revoke API key |
-| `POST` | `/url` | ✅ Cookie | 30/15m | Create short URL (PRG redirect to `/?created=`) |
-| `GET` | `/url/:id` | ❌ Public | — | Redis-cached redirect + bot/geo/UA telemetry |
-| `GET` | `/url/analytics/:id` | ✅ Owner | — | Analytics dashboard, QR code, & edit form |
-| `POST` | `/url/edit/:id` | ✅ Owner | — | Update destination URL & invalidate Redis |
-| `POST` | `/url/toggle/:id` | ✅ Owner | — | Pause/resume link & invalidate Redis |
-| `POST` | `/url/delete/:id` | ✅ Owner | — | Delete link & invalidate Redis |
-
-### Developer REST API (`/api/v1`)
-Authenticate with `Authorization: Bearer <your_api_key>` or `x-api-key: <your_api_key>`:
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/v1/shorten` | Create short link (`{ url, customAlias?, expiresAt? }`) |
-| `GET` | `/api/v1/links` | List links with `?q=`, `?sort=`, `?page=`, `?limit=` |
-| `GET` | `/api/v1/analytics/:id` | JSON analytics (`humanClicks`, `botClicks`, `uniqueClicks`, breakdowns) |
-| `PATCH` | `/api/v1/links/:id` | Edit destination URL (`{ redirectId }`) + clear cache |
-| `DELETE` | `/api/v1/links/:id` | Delete link + clear cache |
+Open `http://localhost:5000` (or `http://localhost:5000/api-docs` for Swagger UI).
 
 ---
 
@@ -159,10 +133,7 @@ Authenticate with `Authorization: Bearer <your_api_key>` or `x-api-key: <your_ap
 npm test
 ```
 
-Runs all **110 tests** across 3 suites:
-1. `tests/phase2.test.js` — 84 unit & schema tests
-2. `tests/integration.test.js` — 14 in-process HTTP integration tests
-3. `tests/phase4.test.js` — 12 Phase 4 + live Docker Redis cache-hit & invalidation tests
+Runs all **138 tests** across 6 suites (`phase2`, `integration`, `phase4`, `phase5`, `phase6`, `phase7`).
 
 ---
 

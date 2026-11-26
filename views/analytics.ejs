@@ -203,6 +203,7 @@
 
     <!-- Edit Destination URL & Webhook -->
     <form method="POST" action="/url/edit/<%= shortId %>" style="display:flex;gap:0.6rem;margin-bottom:1.25rem;flex-wrap:wrap;">
+        <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
         <input
             type="url"
             name="redirectId"
@@ -224,11 +225,13 @@
     <!-- Actions -->
     <div class="actions-row">
         <form method="POST" action="/url/toggle/<%= shortId %>" style="display:inline">
+            <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
             <button type="submit" class="btn-action warn">
                 <%= isActive ? '⏸ Pause Link' : '▶ Resume Link' %>
             </button>
         </form>
         <form method="POST" action="/url/delete/<%= shortId %>" class="delete-form" style="display:inline">
+            <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
             <button type="submit" class="btn-action danger">🗑 Delete Link</button>
         </form>
     </div>

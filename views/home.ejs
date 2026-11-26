@@ -216,6 +216,7 @@
     <!-- Shorten Form -->
     <div class="card">
         <form method="POST" action="/url" id="shortenForm">
+            <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
             <div class="url-form">
                 <input
                     type="url"
@@ -432,6 +433,7 @@
 
                             <!-- Toggle active/pause -->
                             <form method="POST" action="/url/toggle/<%= url.shortId %>" style="display:inline">
+                                <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
                                 <button type="submit" class="btn-sm warn">
                                     <%= url.isActive ? 'Pause' : 'Resume' %>
                                 </button>
@@ -439,6 +441,7 @@
 
                             <!-- Delete -->
                             <form method="POST" action="/url/delete/<%= url.shortId %>" class="delete-form" style="display:inline">
+                                <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
                                 <button type="submit" class="btn-sm danger">Delete</button>
                             </form>
                         </div>
@@ -479,12 +482,14 @@
             <div style="display:flex;gap:0.5rem;">
                 <a href="/api-docs" target="_blank" class="btn-sm">Swagger Docs ↗</a>
                 <form method="POST" action="/user/api-key" style="display:inline">
+                    <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
                     <button type="submit" class="btn-sm">
                         <%= locals.apiKeyPrefix ? '↻ Regenerate Key' : '+ Generate API Key' %>
                     </button>
                 </form>
                 <% if (locals.apiKeyPrefix) { %>
                 <form method="POST" action="/user/api-key/revoke" style="display:inline">
+                    <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
                     <button type="submit" class="btn-sm danger">Revoke</button>
                 </form>
                 <% } %>

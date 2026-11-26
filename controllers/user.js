@@ -3,18 +3,16 @@ const crypto = require("crypto");
 const User = require("../models/user");
 const { setUser } = require("../service/auth");
 const { hashApiKey } = require("../middlewares/apiAuth");
+const { signupSchema, loginSchema } = require("../validators/schemas");
 
 const SALT_ROUNDS = 10;
 
 async function handleUserSignup(req, res) {
-  const { name, email, password } = req.body;
-
-  if (!name || !email || !password) {
-    return res.render("signup", { error: "All fields are required." });
+  const parsed = signupSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.render("signup", { error: parsed.error.issues[0]?.message || "Invalid input." });
   }
-  if (password.length < 6) {
-    return res.render("signup", { error: "Password must be at least 6 characters." });
-  }
+  const { name, email, password } = parsed.data;
 
   const existing = await User.findOne({ email });
   if (existing) {
@@ -28,11 +26,11 @@ async function handleUserSignup(req, res) {
 }
 
 async function handleUserLogin(req, res) {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.render("login", { error: "Email and password are required." });
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.render("login", { error: parsed.error.issues[0]?.message || "Invalid credentials." });
   }
+  const { email, password } = parsed.data;
 
   const user = await User.findOne({ email });
 

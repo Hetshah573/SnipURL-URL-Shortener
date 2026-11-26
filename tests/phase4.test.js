@@ -10,6 +10,7 @@
  * Run: node tests/phase4.test.js
  */
 require("dotenv").config();
+process.env.DISABLE_CLICK_QUEUE = "true";
 
 const express = require("express");
 const cookieParser = require("cookie-parser");
