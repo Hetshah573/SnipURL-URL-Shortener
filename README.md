@@ -91,6 +91,47 @@
 
 ---
 
+## 🏗️ Architecture Diagram
+
+```mermaid
+flowchart TD
+    Client["Browser / REST Client"] -->|HTTP + Cookies / Bearer API Key| Express["Express v5 Server (index.js)"]
+
+    subgraph MW["Middleware Pipeline"]
+        Logger["Pino Request Logger + X-Request-Id"]
+        Helmet["Helmet CSP & Security Headers"]
+        Parsers["JSON / URL-Encoded / Cookie Parser"]
+        CSRF["Double-Submit CSRF Guard (Web Forms)"]
+        Rate["Rate Limiter (Login / Signup / Shorten)"]
+    end
+
+    Express --> Logger --> Helmet --> Parsers --> CSRF --> Rate
+
+    Rate -->|"/ (Dashboard)"| StaticRoute["staticroute.js + checkAuth (JWT)"]
+    Rate -->|"/user/*"| UserRoute["routes/user.js (bcrypt + JWT + API Keys)"]
+    Rate -->|"/url/*"| UrlRoute["routes/url.js (Auth + Public Redirect)"]
+    Rate -->|"/api/v1/*"| ApiRoute["routes/api.js + authenticateApiKey"]
+    Rate -->|"/api-docs"| Swagger["Swagger UI (OpenAPI 3.0)"]
+
+    StaticRoute --> Views["EJS Views (home, analytics, unlock, login, signup)"]
+    UrlRoute --> Safety["URL Safety Guard (Self-Redirect + Safe Browsing)"]
+    UrlRoute --> Zod["Zod Schema Validation"]
+    ApiRoute --> Zod
+
+    UrlRoute -->|"GET /url/:id (Cache Hit <1ms)"| Redis[("Redis (Upstash / Docker)")]
+    UrlRoute -->|"Cache Miss / Analytics / CRUD"| Mongo[("MongoDB (Mongoose)")]
+    UserRoute --> Mongo
+    ApiRoute --> Mongo
+    ApiRoute --> Redis
+
+    UrlRoute -->|"Enqueue Click Telemetry"| BullMQ["BullMQ Queue (snipurl-click-logs)"]
+    BullMQ --> Redis
+    BullMQ -->|"Background Worker ($push visitHistory)"| Mongo
+    UrlRoute -->|"Async POST link.clicked"| Webhook["External Webhook Listener"]
+```
+
+---
+
 ## ⚙️ Setup & Installation
 
 ### Option A: Local / Hosted Redis (Upstash)
